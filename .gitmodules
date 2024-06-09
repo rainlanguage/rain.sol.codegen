@@ -1,0 +1,9 @@
+[submodule "lib/forge-std"]
+	path = lib/forge-std
+	url = https://github.com/foundry-rs/forge-std
+[submodule "lib/rain.interpreter.interface"]
+	path = lib/rain.interpreter.interface
+	url = https://github.com/rainlanguage/rain.interpreter.interface
+[submodule "lib/rain.math.binary"]
+	path = lib/rain.math.binary
+	url = https://github.com/rainlanguage/rain.math.binary

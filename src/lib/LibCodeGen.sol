@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: CAL
 pragma solidity ^0.8.25;
 
+import {Vm} from "forge-std/Vm.sol";
+import {IOpcodeToolingV1} from "../interface/IOpcodeToolingV1.sol";
+import {IParserToolingV1} from "../interface/IParserToolingV1.sol";
+import {ISubParserToolingV1} from "../interface/ISubParserToolingV1.sol";
+import {IIntegrityToolingV1} from "../interface/IIntegrityToolingV1.sol";
+import {AuthoringMetaV2} from "rain.interpreter.interface/interface/IParserV1.sol";
+import {LibHexString} from "./LibHexString.sol";
+import {LibGenParseMeta} from "./LibGenParseMeta.sol";
+
 uint256 constant MAX_LINE_LENGTH = 120;
 string constant NEWLINE_DUE_TO_MAX_LENGTH = "\n    ";
 
@@ -87,13 +96,13 @@ library LibCodeGen {
         );
     }
 
-    function parseMetaConstantString(bytes memory authoringMetaBytes, uint8 buildDepth)
+    function parseMetaConstantString(Vm vm, bytes memory authoringMetaBytes, uint8 buildDepth)
         internal
         pure
         returns (string memory)
     {
         AuthoringMetaV2[] memory authoringMeta = abi.decode(authoringMetaBytes, (AuthoringMetaV2[]));
-        bytes memory parseMeta = LibParseMeta.buildParseMetaV2(authoringMeta, buildDepth);
+        bytes memory parseMeta = LibGenParseMeta.buildParseMetaV2(authoringMeta, buildDepth);
         return string.concat(
             "\n",
             "/// @dev Encodes the parser meta that is used to lookup word definitions.\n",
@@ -114,7 +123,7 @@ library LibCodeGen {
             "/// filters then we have a miss.\n",
             "bytes constant PARSE_META =\n",
             "    hex\"",
-            bytesToHex(parseMeta),
+            LibHexString.bytesToHex(parseMeta),
             "\";\n\n",
             "/// @dev The build depth of the parser meta.\n",
             "uint8 constant PARSE_META_BUILD_DEPTH = ",
@@ -123,7 +132,7 @@ library LibCodeGen {
         );
     }
 
-    function subParserWordParsersConstantString(RainterpreterReferenceExternNPE2 extern)
+    function subParserWordParsersConstantString(ISubParserToolingV1 subParser)
         internal
         pure
         returns (string memory)
@@ -131,12 +140,12 @@ library LibCodeGen {
         return string.concat(
             "\n",
             "/// @dev Real function pointers to the sub parser functions that produce the\n",
-            "/// bytecode that this contract knows about. This is both constructing the extern\n",
+            "/// bytecode that this contract knows about. This is both constructing the subParser\n",
             "/// bytecode that dials back into this contract at eval time, and mapping\n",
             "/// to things that happen entirely on the interpreter such as well known\n",
             "/// constants and references to the context grid.\n",
             "bytes constant SUB_PARSER_WORD_PARSERS = hex\"",
-            bytesToHex(extern.buildSubParserWordParsers()),
+            LibHexString.bytesToHex(subParser.buildSubParserWordParsers()),
             "\";\n"
         );
     }
@@ -146,7 +155,7 @@ library LibCodeGen {
         view
         returns (string memory)
     {
-        string memory integrityFunctionPointers = bytesToHex(deployer.buildIntegrityFunctionPointers());
+        string memory integrityFunctionPointers = LibHexString.bytesToHex(deployer.buildIntegrityFunctionPointers());
         return string.concat(
             "\n",
             "/// @dev The function pointers for the integrity check fns.\n",
@@ -158,7 +167,7 @@ library LibCodeGen {
         );
     }
 
-    function describedByMetaHashConstantString(string memory name) internal view returns (string memory) {
+    function describedByMetaHashConstantString(Vm vm, string memory name) internal view returns (string memory) {
         bytes memory describedByMeta = vm.readFileBinary(string.concat("meta/", name, ".rain.meta"));
         return string.concat(
             "\n",

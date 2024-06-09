@@ -26,11 +26,7 @@ library LibCodeGen {
         );
     }
 
-    function pathForContract(string memory contractName) internal pure returns (string memory) {
-        return string.concat("src/generated/", contractName, ".pointers.sol");
-    }
-
-    function bytecodeHashConstantString(address instance) internal view returns (string memory) {
+    function bytecodeHashConstantString(Vm vm, address instance) internal view returns (string memory) {
         bytes32 bytecodeHash;
         assembly {
             bytecodeHash := extcodehash(instance)
@@ -44,8 +40,12 @@ library LibCodeGen {
         );
     }
 
-    function opcodeFunctionPointersConstantString(IOpcodeToolingV1 interpreter) internal view returns (string memory) {
-        string memory functionPointers = bytesToHex(interpreter.buildOpcodeFunctionPointers());
+    function opcodeFunctionPointersConstantString(Vm vm, IOpcodeToolingV1 interpreter)
+        internal
+        view
+        returns (string memory)
+    {
+        string memory functionPointers = LibHexString.bytesToHex(vm, interpreter.buildOpcodeFunctionPointers());
         return string.concat(
             "\n",
             "/// @dev The function pointers known to the interpreter for dynamic dispatch.\n",
@@ -60,7 +60,7 @@ library LibCodeGen {
         );
     }
 
-    function literalParserFunctionPointersConstantString(IParserToolingV1 instance)
+    function literalParserFunctionPointersConstantString(Vm vm, IParserToolingV1 instance)
         internal
         pure
         returns (string memory)
@@ -72,17 +72,18 @@ library LibCodeGen {
             "/// rather than a full word lookup, and are done with simple conditional\n",
             "/// jumps as the possibilities are limited compared to the number of words we\n" "/// have.\n",
             "bytes constant LITERAL_PARSER_FUNCTION_POINTERS = hex\"",
-            bytesToHex(instance.buildLiteralParserFunctionPointers()),
+            LibHexString.bytesToHex(vm, instance.buildLiteralParserFunctionPointers()),
             "\";\n"
         );
     }
 
-    function operandHandlerFunctionPointersConstantString(IParserToolingV1 instance)
+    function operandHandlerFunctionPointersConstantString(Vm vm, IParserToolingV1 instance)
         internal
         pure
         returns (string memory)
     {
-        string memory operandHandlerFunctionPointers = bytesToHex(instance.buildOperandHandlerFunctionPointers());
+        string memory operandHandlerFunctionPointers =
+            LibHexString.bytesToHex(vm, instance.buildOperandHandlerFunctionPointers());
         return string.concat(
             "\n",
             "/// @dev Every two bytes is a function pointer for an operand handler.\n",
@@ -123,7 +124,7 @@ library LibCodeGen {
             "/// filters then we have a miss.\n",
             "bytes constant PARSE_META =\n",
             "    hex\"",
-            LibHexString.bytesToHex(parseMeta),
+            LibHexString.bytesToHex(vm, parseMeta),
             "\";\n\n",
             "/// @dev The build depth of the parser meta.\n",
             "uint8 constant PARSE_META_BUILD_DEPTH = ",
@@ -132,7 +133,7 @@ library LibCodeGen {
         );
     }
 
-    function subParserWordParsersConstantString(ISubParserToolingV1 subParser)
+    function subParserWordParsersConstantString(Vm vm, ISubParserToolingV1 subParser)
         internal
         pure
         returns (string memory)
@@ -145,17 +146,17 @@ library LibCodeGen {
             "/// to things that happen entirely on the interpreter such as well known\n",
             "/// constants and references to the context grid.\n",
             "bytes constant SUB_PARSER_WORD_PARSERS = hex\"",
-            LibHexString.bytesToHex(subParser.buildSubParserWordParsers()),
+            LibHexString.bytesToHex(vm, subParser.buildSubParserWordParsers()),
             "\";\n"
         );
     }
 
-    function integrityFunctionPointersConstantString(IIntegrityToolingV1 deployer)
+    function integrityFunctionPointersConstantString(Vm vm, IIntegrityToolingV1 deployer)
         internal
         view
         returns (string memory)
     {
-        string memory integrityFunctionPointers = LibHexString.bytesToHex(deployer.buildIntegrityFunctionPointers());
+        string memory integrityFunctionPointers = LibHexString.bytesToHex(vm, deployer.buildIntegrityFunctionPointers());
         return string.concat(
             "\n",
             "/// @dev The function pointers for the integrity check fns.\n",

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CAL
 pragma solidity ^0.8.25;
 
-import { Vm } from "forge-std/Vm.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 library LibHexString {
     function bytesToHex(Vm vm, bytes memory data) internal pure returns (string memory) {

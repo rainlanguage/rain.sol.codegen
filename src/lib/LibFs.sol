@@ -1,13 +1,22 @@
 // SPDX-License-Identifier: CAL
 pragma solidity ^0.8.25;
 
+import {Vm} from "forge-std/Vm.sol";
+import {LibCodeGen} from "./LibCodeGen.sol";
+
 library LibFs {
-    function buildFileForContract(address instance, string memory contractName, string memory body) internal {
+    function pathForContract(string memory contractName) internal pure returns (string memory) {
+        return string.concat("src/generated/", contractName, ".pointers.sol");
+    }
+
+    function buildFileForContract(Vm vm, address instance, string memory contractName, string memory body) internal {
         string memory path = pathForContract(contractName);
 
         if (vm.exists(path)) {
             vm.removeFile(path);
         }
-        vm.writeFile(path, string.concat(filePrefix(), bytecodeHashConstantString(instance), body));
+        vm.writeFile(
+            path, string.concat(LibCodeGen.filePrefix(), LibCodeGen.bytecodeHashConstantString(vm, instance), body)
+        );
     }
 }

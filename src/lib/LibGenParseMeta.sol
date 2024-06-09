@@ -2,13 +2,70 @@
 pragma solidity ^0.8.25;
 
 import {AuthoringMetaV2} from "rain.interpreter.interface/interface/IParserV1.sol";
-import {META_ITEM_SIZE} from "rain.interpreter.interface/lib/parse/LibParseMeta.sol";
+import {
+    META_ITEM_SIZE,
+    FINGERPRINT_MASK,
+    META_EXPANSION_SIZE,
+    META_PREFIX_SIZE,
+    LibParseMeta
+} from "rain.interpreter.interface/lib/parse/LibParseMeta.sol";
 import {LibCtPop} from "rain.math.binary/lib/LibCtPop.sol";
 
 uint256 constant META_ITEM_MASK = (1 << META_ITEM_SIZE) - 1;
 
+/// @dev For metadata builder.
+error DuplicateFingerprint();
 
 library LibGenParseMeta {
+    function findBestExpander(AuthoringMetaV2[] memory metas)
+        internal
+        pure
+        returns (uint8 bestSeed, uint256 bestExpansion, AuthoringMetaV2[] memory remaining)
+    {
+        unchecked {
+            {
+                uint256 bestCt = 0;
+                for (uint256 seed = 0; seed < type(uint8).max; seed++) {
+                    uint256 expansion = 0;
+                    for (uint256 i = 0; i < metas.length; i++) {
+                        (uint256 shifted, uint256 hashed) = LibParseMeta.wordBitmapped(seed, metas[i].word);
+                        (hashed);
+                        expansion = shifted | expansion;
+                    }
+                    uint256 ct = LibCtPop.ctpop(expansion);
+                    if (ct > bestCt) {
+                        bestCt = ct;
+                        bestSeed = uint8(seed);
+                        bestExpansion = expansion;
+                    }
+                    // perfect expansion.
+                    if (ct == metas.length) {
+                        break;
+                    }
+                }
+
+                uint256 remainingLength = metas.length - bestCt;
+                assembly ("memory-safe") {
+                    remaining := mload(0x40)
+                    mstore(remaining, remainingLength)
+                    mstore(0x40, add(remaining, mul(0x20, add(1, remainingLength))))
+                }
+            }
+            uint256 usedExpansion = 0;
+            uint256 j = 0;
+            for (uint256 i = 0; i < metas.length; i++) {
+                (uint256 shifted, uint256 hashed) = LibParseMeta.wordBitmapped(bestSeed, metas[i].word);
+                (hashed);
+                if ((shifted & usedExpansion) == 0) {
+                    usedExpansion = shifted | usedExpansion;
+                } else {
+                    remaining[j] = metas[i];
+                    j++;
+                }
+            }
+        }
+    }
+
     function buildParseMetaV2(AuthoringMetaV2[] memory authoringMeta, uint8 maxDepth)
         internal
         pure
@@ -73,7 +130,7 @@ library LibGenParseMeta {
                         uint256 hashed;
                         {
                             uint256 shifted;
-                            (shifted, hashed) = wordBitmapped(seeds[s], authoringMeta[k].word);
+                            (shifted, hashed) = LibParseMeta.wordBitmapped(seeds[s], authoringMeta[k].word);
 
                             uint256 metaItemSize = META_ITEM_SIZE;
                             uint256 pos = LibCtPop.ctpop(expansion & (shifted - 1)) + cumulativePos;

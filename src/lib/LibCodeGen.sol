@@ -103,7 +103,8 @@ library LibCodeGen {
         returns (string memory)
     {
         AuthoringMetaV2[] memory authoringMeta = abi.decode(authoringMetaBytes, (AuthoringMetaV2[]));
-        bytes memory parseMeta = LibGenParseMeta.buildParseMetaV2(authoringMeta, buildDepth);
+        string memory parseMeta =
+            LibHexString.bytesToHex(vm, LibGenParseMeta.buildParseMetaV2(authoringMeta, buildDepth));
         return string.concat(
             "\n",
             "/// @dev Encodes the parser meta that is used to lookup word definitions.\n",
@@ -122,9 +123,10 @@ library LibCodeGen {
             "/// again with the next bloom filter, offsetting all the indexes by the total\n",
             "/// bit count of the previous bloom filter. If we reach the end of the bloom\n",
             "/// filters then we have a miss.\n",
-            "bytes constant PARSE_META =\n",
-            "    hex\"",
-            LibHexString.bytesToHex(vm, parseMeta),
+            "bytes constant PARSE_META =",
+            bytes(parseMeta).length + 34 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
+            "hex\"",
+            parseMeta,
             "\";\n\n",
             "/// @dev The build depth of the parser meta.\n",
             "uint8 constant PARSE_META_BUILD_DEPTH = ",

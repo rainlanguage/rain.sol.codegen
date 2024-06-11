@@ -103,7 +103,8 @@ library LibCodeGen {
         returns (string memory)
     {
         AuthoringMetaV2[] memory authoringMeta = abi.decode(authoringMetaBytes, (AuthoringMetaV2[]));
-        string memory parseMeta = LibHexString.bytesToHex(LibGenParseMeta.buildParseMetaV2(authoringMeta, buildDepth));
+        string memory parseMeta =
+            LibHexString.bytesToHex(vm, LibGenParseMeta.buildParseMetaV2(authoringMeta, buildDepth));
         return string.concat(
             "\n",
             "/// @dev Encodes the parser meta that is used to lookup word definitions.\n",

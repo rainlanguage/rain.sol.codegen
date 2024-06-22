@@ -140,6 +140,7 @@ library LibCodeGen {
         pure
         returns (string memory)
     {
+        string memory subParserWordParsers = LibHexString.bytesToHex(vm, subParser.buildSubParserWordParsers());
         return string.concat(
             "\n",
             "/// @dev Real function pointers to the sub parser functions that produce the\n",
@@ -147,8 +148,10 @@ library LibCodeGen {
             "/// bytecode that dials back into this contract at eval time, and mapping\n",
             "/// to things that happen entirely on the interpreter such as well known\n",
             "/// constants and references to the context grid.\n",
-            "bytes constant SUB_PARSER_WORD_PARSERS = hex\"",
-            LibHexString.bytesToHex(vm, subParser.buildSubParserWordParsers()),
+            "bytes constant SUB_PARSER_WORD_PARSERS =",
+            bytes(subParserWordParsers).length + 47 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
+            "hex\"",
+            subParserWordParsers,
             "\";\n"
         );
     }
@@ -163,7 +166,7 @@ library LibCodeGen {
             "\n",
             "/// @dev The function pointers for the integrity check fns.\n",
             "bytes constant INTEGRITY_FUNCTION_POINTERS =",
-            bytes(integrityFunctionPointers).length + 46 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
+            bytes(integrityFunctionPointers).length + 51 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
             "hex\"",
             integrityFunctionPointers,
             "\";\n"

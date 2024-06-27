@@ -51,7 +51,7 @@ library LibCodeGen {
                 "/// @dev The function pointers known to the interpreter for dynamic dispatch.\n",
                 "/// By setting these as a constant they can be inlined into the interpreter\n",
                 "/// and loaded at eval time for very low gas (~100) due to the compiler\n",
-                "/// optimising it to a single `codecopy` to build the in memory bytes array.\n"
+                "/// optimising it to a single `codecopy` to build the in memory bytes array."
             ),
             "OPCODE_FUNCTION_POINTERS",
             interpreter.buildOpcodeFunctionPointers()
@@ -70,7 +70,7 @@ library LibCodeGen {
                 "/// Literal dispatches are determined by the first byte(s) of the literal\n",
                 "/// rather than a full word lookup, and are done with simple conditional\n",
                 "/// jumps as the possibilities are limited compared to the number of words we\n",
-                "/// have.\n"
+                "/// have."
             ),
             "LITERAL_PARSER_FUNCTION_POINTERS",
             instance.buildLiteralParserFunctionPointers()
@@ -87,7 +87,7 @@ library LibCodeGen {
             string.concat(
                 "/// @dev Every two bytes is a function pointer for an operand handler.\n",
                 "/// These positional indexes all map to the same indexes looked up in the parse\n",
-                "/// meta.\n"
+                "/// meta."
             ),
             "OPERAND_HANDLER_FUNCTION_POINTERS",
             instance.buildOperandHandlerFunctionPointers()
@@ -118,7 +118,7 @@ library LibCodeGen {
                 "/// fingerprints equal then we have a match, else we increment the seed and try\n",
                 "/// again with the next bloom filter, offsetting all the indexes by the total\n",
                 "/// bit count of the previous bloom filter. If we reach the end of the bloom\n",
-                "/// filters then we have a miss.\n"
+                "/// filters then we have a miss."
             ),
             "PARSE_META",
             LibGenParseMeta.buildParseMetaV2(authoringMeta, buildDepth)
@@ -137,7 +137,7 @@ library LibCodeGen {
                 "/// bytecode that this contract knows about. This is both constructing the subParser\n",
                 "/// bytecode that dials back into this contract at eval time, and mapping\n",
                 "/// to things that happen entirely on the interpreter such as well known\n",
-                "/// constants and references to the context grid.\n"
+                "/// constants and references to the context grid."
             ),
             "SUB_PARSER_WORD_PARSERS",
             subParser.buildSubParserWordParsers()
@@ -151,7 +151,7 @@ library LibCodeGen {
     {
         return bytesConstantString(
             vm,
-            "/// @dev The function pointers for the integrity check fns.\n",
+            "/// @dev The function pointers for the integrity check fns.",
             "INTEGRITY_FUNCTION_POINTERS",
             deployer.buildIntegrityFunctionPointers()
         );
@@ -177,10 +177,10 @@ library LibCodeGen {
         return string.concat(
             "\n",
             comment,
-            "bytes constant ",
+            "\nbytes constant ",
             name,
-            bytes(hexData).length + bytes(name).length + 15 + 7 + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
-            " = hex\"",
+            15 + bytes(name).length + 6 + bytes(hexData).length + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
+            "= hex\"",
             hexData,
             "\";\n"
         );

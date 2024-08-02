@@ -6,7 +6,7 @@ import {IOpcodeToolingV1} from "../interface/IOpcodeToolingV1.sol";
 import {IParserToolingV1} from "../interface/IParserToolingV1.sol";
 import {ISubParserToolingV1} from "../interface/ISubParserToolingV1.sol";
 import {IIntegrityToolingV1} from "../interface/IIntegrityToolingV1.sol";
-import {AuthoringMetaV2} from "rain.interpreter.interface/interface/IParserV1.sol";
+import {AuthoringMetaV2} from "rain.interpreter.interface/interface/IParserV2.sol";
 import {LibHexString} from "./LibHexString.sol";
 import {LibGenParseMeta} from "./LibGenParseMeta.sol";
 

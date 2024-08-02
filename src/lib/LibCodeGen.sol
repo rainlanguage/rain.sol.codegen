@@ -100,28 +100,33 @@ library LibCodeGen {
         returns (string memory)
     {
         AuthoringMetaV2[] memory authoringMeta = abi.decode(authoringMetaBytes, (AuthoringMetaV2[]));
-        return bytesConstantString(
-            vm,
-            string.concat(
-                "/// @dev The parse meta that is used to lookup word definitions.\n",
-                "/// The structure of the parse meta is:\n",
-                "/// - 1 byte: The depth of the bloom filters\n",
-                "/// - 1 byte: The hashing seed\n",
-                "/// - The bloom filters, each is 32 bytes long, one for each build depth.\n",
-                "/// - All the items for each word, each is 4 bytes long. Each item's first byte\n",
-                "///   is its opcode index, the remaining 3 bytes are the word fingerprint.\n",
-                "/// To do a lookup, the word is hashed with the seed, then the first byte of the\n",
-                "/// hash is compared against the bloom filter. If there is a hit then we count\n",
-                "/// the number of 1 bits in the bloom filter up to this item's 1 bit. We then\n",
-                "/// treat this a the index of the item in the items array. We then compare the\n",
-                "/// word fingerprint against the fingerprint of the item at this index. If the\n",
-                "/// fingerprints equal then we have a match, else we increment the seed and try\n",
-                "/// again with the next bloom filter, offsetting all the indexes by the total\n",
-                "/// bit count of the previous bloom filter. If we reach the end of the bloom\n",
-                "/// filters then we have a miss."
+        return string.concat(
+            bytesConstantString(
+                vm,
+                string.concat(
+                    "/// @dev The parse meta that is used to lookup word definitions.\n",
+                    "/// The structure of the parse meta is:\n",
+                    "/// - 1 byte: The depth of the bloom filters\n",
+                    "/// - 1 byte: The hashing seed\n",
+                    "/// - The bloom filters, each is 32 bytes long, one for each build depth.\n",
+                    "/// - All the items for each word, each is 4 bytes long. Each item's first byte\n",
+                    "///   is its opcode index, the remaining 3 bytes are the word fingerprint.\n",
+                    "/// To do a lookup, the word is hashed with the seed, then the first byte of the\n",
+                    "/// hash is compared against the bloom filter. If there is a hit then we count\n",
+                    "/// the number of 1 bits in the bloom filter up to this item's 1 bit. We then\n",
+                    "/// treat this a the index of the item in the items array. We then compare the\n",
+                    "/// word fingerprint against the fingerprint of the item at this index. If the\n",
+                    "/// fingerprints equal then we have a match, else we increment the seed and try\n",
+                    "/// again with the next bloom filter, offsetting all the indexes by the total\n",
+                    "/// bit count of the previous bloom filter. If we reach the end of the bloom\n",
+                    "/// filters then we have a miss."
+                ),
+                "PARSE_META",
+                LibGenParseMeta.buildParseMetaV2(authoringMeta, buildDepth)
             ),
-            "PARSE_META",
-            LibGenParseMeta.buildParseMetaV2(authoringMeta, buildDepth)
+            uint8ConstantString(
+                vm, "/// @dev The build depth of the parser meta.\n", "PARSE_META_BUILD_DEPTH", buildDepth
+            )
         );
     }
 
@@ -183,6 +188,23 @@ library LibCodeGen {
             "= hex\"",
             hexData,
             "\";\n"
+        );
+    }
+
+    function uint8ConstantString(Vm vm, string memory comment, string memory name, uint8 data)
+        internal
+        pure
+        returns (string memory)
+    {
+        return string.concat(
+            "\n",
+            comment,
+            "\nuint8 constant ",
+            name,
+            15 + bytes(name).length + 6 + 3 + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
+            "= ",
+            vm.toString(data),
+            ";\n"
         );
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CAL
 pragma solidity ^0.8.18;
 
-import {AuthoringMetaV2} from "rain.interpreter.interface/interface/IParserV1.sol";
+import {AuthoringMetaV2} from "rain.interpreter.interface/interface/IParserV2.sol";
 
 library LibAuthoringMeta {
     function copyWordsFromAuthoringMeta(AuthoringMetaV2[] memory authoringMeta)

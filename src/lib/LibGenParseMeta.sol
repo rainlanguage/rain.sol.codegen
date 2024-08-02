@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CAL
 pragma solidity ^0.8.25;
 
-import {AuthoringMetaV2} from "rain.interpreter.interface/interface/IParserV1.sol";
+import {AuthoringMetaV2} from "rain.interpreter.interface/interface/IParserV2.sol";
 import {
     META_ITEM_SIZE,
     FINGERPRINT_MASK,

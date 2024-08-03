@@ -13,3 +13,7 @@ bytes32 constant BYTECODE_HASH = bytes32(0xe2bafcba65b2c99d33f5096307bc57c2e7f19
 
 /// @dev Some bytes comment.
 bytes constant SOME_BYTES_CONSTANT = hex"12345678";
+
+/// @dev Longer constant.
+bytes constant LONGER_BYTES_CONSTANT =
+    hex"e2bafcba65b2c99d33f5096307bc57c2e7f195d2a178f56e45d720bb64344998e2bafcba65b2c99d33f5096307bc57c2e7f195d2a178f56e45d720bb64344998";

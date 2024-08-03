@@ -184,8 +184,9 @@ library LibCodeGen {
             comment,
             "\nbytes constant ",
             name,
-            15 + bytes(name).length + 6 + bytes(hexData).length + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
-            "= hex\"",
+            " =",
+            17 + bytes(name).length + 6 + bytes(hexData).length + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
+            "hex\"",
             hexData,
             "\";\n"
         );
@@ -201,8 +202,8 @@ library LibCodeGen {
             comment,
             "\nuint8 constant ",
             name,
-            15 + bytes(name).length + 6 + 3 + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
-            "= ",
+            " =",
+            17 + bytes(name).length + 6 + 3 + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
             vm.toString(data),
             ";\n"
         );

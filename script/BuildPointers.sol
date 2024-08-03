@@ -15,7 +15,13 @@ contract BuildPointers is Script {
             address(codeGennable),
             "CodeGennable",
             string.concat(
-                LibCodeGen.bytesConstantString(vm, "/// @dev Some bytes comment.", "SOME_BYTES_CONSTANT", hex"12345678")
+                LibCodeGen.bytesConstantString(vm, "/// @dev Some bytes comment.", "SOME_BYTES_CONSTANT", hex"12345678"),
+                LibCodeGen.bytesConstantString(
+                    vm,
+                    "/// @dev Longer constant.",
+                    "LONGER_BYTES_CONSTANT",
+                    hex"e2bafcba65b2c99d33f5096307bc57c2e7f195d2a178f56e45d720bb64344998e2bafcba65b2c99d33f5096307bc57c2e7f195d2a178f56e45d720bb64344998"
+                )
             )
         );
     }

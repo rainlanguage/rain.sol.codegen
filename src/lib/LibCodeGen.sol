@@ -1,4 +1,5 @@
-// SPDX-License-Identifier: CAL
+// SPDX-License-Identifier: LicenseRef-DCL-1.0
+// SPDX-FileCopyrightText: Copyright (c) 2020 thedavidmeister
 pragma solidity ^0.8.25;
 
 import {Vm} from "forge-std/Vm.sol";
@@ -19,7 +20,8 @@ library LibCodeGen {
             "// dependency between the contract and its pointers file. The contract\n"
             "// needs the pointers file to exist so that it can compile, and the pointers\n"
             "// file needs the contract to exist so that it can be compiled.\n\n",
-            "// SPDX-License-Identifier: CAL\n",
+            "// SPDX-License-Identifier: LicenseRef-DCL-1.0\n",
+            "// SPDX-FileCopyrightText: Copyright (c) 2020 thedavidmeister\n",
             "pragma solidity =0.8.25;\n"
         );
     }

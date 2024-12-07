@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-DCL-1.0
-// SPDX-FileCopyrightText: Copyright (c) 2020 thedavidmeister
+// SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity ^0.8.25;
 
 import {Vm} from "forge-std/Vm.sol";
@@ -21,7 +21,7 @@ library LibCodeGen {
             "// needs the pointers file to exist so that it can compile, and the pointers\n"
             "// file needs the contract to exist so that it can be compiled.\n\n",
             "// SPDX-License-Identifier: LicenseRef-DCL-1.0\n",
-            "// SPDX-FileCopyrightText: Copyright (c) 2020 thedavidmeister\n",
+            "// SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd\n",
             "pragma solidity =0.8.25;\n"
         );
     }

@@ -1,0 +1,8 @@
+{
+  "lib/forge-std": {
+    "rev": "b8f065fda83b8cd94a6b2fec8fcd911dc3b444fd"
+  },
+  "lib/rain.math.binary": {
+    "rev": "54450d62a89be456d07db1b9508f3b8a24dbb5f8"
+  }
+}

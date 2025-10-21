@@ -1,2 +1,0 @@
-LibBloomTest:testLibBloomNoFalseNegatives(bytes32[],uint256,uint256) (runs: 2048, μ: 41386, ~: 36424)
-LibBloomTest:testLibBloomVaguelyAvoidsFalsePositives(uint256,uint8) (runs: 2048, μ: 1770527, ~: 23096)

@@ -14,8 +14,10 @@ library LibFs {
         string memory path = pathForContract(contractName);
 
         if (vm.exists(path)) {
+            //forge-lint: disable-next-line(unsafe-cheatcode)
             vm.removeFile(path);
         }
+        //forge-lint: disable-next-line(unsafe-cheatcode)
         vm.writeFile(
             path, string.concat(LibCodeGen.filePrefix(), LibCodeGen.bytecodeHashConstantString(vm, instance), body)
         );

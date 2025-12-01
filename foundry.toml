@@ -21,7 +21,7 @@ optimizer_runs = 1000000
 bytecode_hash = "none"
 cbor_metadata = false
 
-evm_version = "paris"
+evm_version = "cancun"
 
 fs_permissions = [
     { access = "read-write", path = "src/generated" },

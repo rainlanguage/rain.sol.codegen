@@ -1,6 +1,6 @@
 {
   "lib/forge-std": {
-    "rev": "b8f065fda83b8cd94a6b2fec8fcd911dc3b444fd"
+    "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
   },
   "lib/rain.math.binary": {
     "rev": "f44f846a43928ba0a7ed4a7bb810a8933e23cce1"

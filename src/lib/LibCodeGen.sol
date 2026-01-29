@@ -28,6 +28,7 @@ library LibCodeGen {
     /// generated code is expected to be imported into some concrete contract
     /// with pragma = version.
     function filePrefix() internal pure returns (string memory) {
+        //REUSE-IgnoreStart
         return string.concat(
             "// SPDX-License-Identifier: LicenseRef-DCL-1.0\n"
             "// SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd\n"
@@ -38,6 +39,7 @@ library LibCodeGen {
             "// needs the pointers file to exist so that it can compile, and the pointers\n"
             "// file needs the contract to exist so that it can be compiled.\n"
         );
+        //REUSE-IgnoreEnd
     }
 
     /// Puts the hash of the bytecode of some contract instance into a constant

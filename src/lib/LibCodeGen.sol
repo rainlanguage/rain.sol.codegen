@@ -222,7 +222,9 @@ library LibCodeGen {
             "\nbytes constant ",
             name,
             " =",
-            17 + bytes(name).length + 6 + bytes(hexData).length + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
+            15 + bytes(name).length + 2 + 1 + 4 + bytes(hexData).length + 2 > MAX_LINE_LENGTH
+                ? NEWLINE_DUE_TO_MAX_LENGTH
+                : " ",
             "hex\"",
             hexData,
             "\";\n"
@@ -241,14 +243,17 @@ library LibCodeGen {
         pure
         returns (string memory)
     {
+        string memory intString = vm.toString(data);
         return string.concat(
             "\n",
             comment,
             "\nuint8 constant ",
             name,
             " =",
-            17 + bytes(name).length + 6 + 3 + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
-            vm.toString(data),
+            15 + bytes(name).length + 2 + 1 + bytes(intString).length + 1 > MAX_LINE_LENGTH
+                ? NEWLINE_DUE_TO_MAX_LENGTH
+                : " ",
+            intString,
             ";\n"
         );
     }

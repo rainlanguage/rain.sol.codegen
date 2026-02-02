@@ -222,7 +222,9 @@ library LibCodeGen {
             "\nbytes constant ",
             name,
             " =",
-            15 + bytes(name).length + 2 + 1 + 4 + bytes(hexData).length + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
+            15 + bytes(name).length + 2 + 1 + 4 + bytes(hexData).length + 2 > MAX_LINE_LENGTH
+                ? NEWLINE_DUE_TO_MAX_LENGTH
+                : " ",
             "hex\"",
             hexData,
             "\";\n"
@@ -248,7 +250,9 @@ library LibCodeGen {
             "\nuint8 constant ",
             name,
             " =",
-            15 + bytes(name).length + 2 + 1 + bytes(intString).length + 1 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
+            15 + bytes(name).length + 2 + 1 + bytes(intString).length + 1 > MAX_LINE_LENGTH
+                ? NEWLINE_DUE_TO_MAX_LENGTH
+                : " ",
             intString,
             ";\n"
         );

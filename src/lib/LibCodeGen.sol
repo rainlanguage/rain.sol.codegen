@@ -222,7 +222,7 @@ library LibCodeGen {
             "\nbytes constant ",
             name,
             " =",
-            17 + bytes(name).length + 6 + bytes(hexData).length + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
+            15 + 2 + bytes(name).length + 1 + 4 + bytes(hexData).length + 2 > MAX_LINE_LENGTH ? NEWLINE_DUE_TO_MAX_LENGTH : " ",
             "hex\"",
             hexData,
             "\";\n"

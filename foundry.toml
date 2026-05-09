@@ -1,7 +1,7 @@
 [profile.default]
 src = 'src'
 out = 'out'
-libs = ['lib']
+libs = ['dependencies']
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
@@ -23,9 +23,13 @@ cbor_metadata = false
 
 evm_version = "cancun"
 
-fs_permissions = [
-    { access = "read-write", path = "src/generated" },
-]
+fs_permissions = [{ access = "read-write", path = "src/generated" }]
 
 [fuzz]
 runs = 2048
+
+[dependencies]
+forge-std = "1.16.1"
+
+[soldeer]
+recursive_deps = false

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.25;
 
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
+import {LibCodeGen} from "./LibCodeGen.sol";
 import {LibFs} from "./LibFs.sol";
 
 /// @title LibSnapshot
@@ -23,6 +24,56 @@ import {LibFs} from "./LibFs.sol";
 /// `fs_permissions = [{ access = "read", path = "foundry.toml" }, ...]`
 /// alongside the usual read-write access to `src/generated`.
 library LibSnapshot {
+    /// @notice The complete deployment record for one deployable, as generated
+    /// Solidity source: the deterministic address it lands at, the creation
+    /// bytecode it is deployed FROM, and the runtime bytecode it is verified
+    /// AGAINST on-chain.
+    ///
+    /// Pair with `LibFs.buildFileForContract(vm, deployed, name, ...)`, which
+    /// prepends `BYTECODE_HASH` derived from the SAME instance. Together that is
+    /// the complete pin — address + codehash + creation + runtime — and it is
+    /// what makes a past release reproducible and independently verifiable after
+    /// the current build diverges:
+    ///
+    /// - `keccak256(RUNTIME_CODE) == BYTECODE_HASH` — the record self-agrees.
+    /// - deploying `CREATION_CODE` reproduces `DEPLOYED_ADDRESS` with that
+    ///   runtime on-chain — address and bytecode cannot drift apart.
+    ///
+    /// A record carrying only address + codehash can do neither. The shape lives
+    /// here, rather than being re-assembled in each repo, so a consumer cannot
+    /// emit an incomplete record by omission.
+    ///
+    /// Returns ONLY the constants, so a caller needing extra generated content
+    /// (parse meta, function pointers) concatenates rather than forking the
+    /// shape.
+    ///
+    /// @param vm The Vm instance.
+    /// @param creationCode The creation bytecode the contract is deployed from.
+    /// @param deployed The address it deterministically deploys to, already
+    /// deployed so its runtime code can be read.
+    /// @return The Solidity source for the record's constants.
+    function deployRecordString(Vm vm, bytes memory creationCode, address deployed)
+        internal
+        view
+        returns (string memory)
+    {
+        return string.concat(
+            LibCodeGen.addressConstantString(
+                vm,
+                "/// @dev Address of the contract deployed via the deterministic\n"
+                "/// deployment proxy. Identical across all EVM-compatible networks.",
+                "DEPLOYED_ADDRESS",
+                deployed
+            ),
+            LibCodeGen.bytesConstantString(
+                vm, "/// @dev The creation bytecode of the contract.", "CREATION_CODE", creationCode
+            ),
+            LibCodeGen.bytesConstantString(
+                vm, "/// @dev The runtime bytecode of the contract.", "RUNTIME_CODE", deployed.code
+            )
+        );
+    }
+
     /// @notice The canonical release tag: `foundry.toml` `[package].version`
     /// with dots converted to underscores (`0.1.7` -> `0_1_7`) for the Solidity
     /// directory form. The single definition of the tag form — the version in

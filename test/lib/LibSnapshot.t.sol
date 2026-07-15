@@ -25,9 +25,17 @@ contract LibSnapshotTest is Test {
     }
 
     /// The tag is `[package].version` from foundry.toml with dots as
-    /// underscores. This repo declares 0.1.0.
+    /// underscores.
+    ///
+    /// Asserted as a RELATIONSHIP to the declared version, never a hardcoded
+    /// literal: this repo's version bumps on every release, so a pinned literal
+    /// fails the very release that bumps it. `vm.replace` derives the expectation
+    /// by a different mechanism than the library's own dot-to-underscore loop, so
+    /// this still discriminates rather than restating the implementation.
     function testDeployTagIsPackageVersionWithUnderscores() external view {
-        assertEq(LibSnapshot.deployTag(vm), "0_1_0");
+        string memory version = vm.parseTomlString(vm.readFile("foundry.toml"), ".package.version");
+        assertTrue(bytes(version).length > 0, "no [package].version declared");
+        assertEq(LibSnapshot.deployTag(vm), vm.replace(version, ".", "_"));
     }
 
     function testDirAndPathForTag() external pure {

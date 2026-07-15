@@ -43,6 +43,19 @@ contract LibSnapshotTest is Test {
         assertEq(LibSnapshot.frozenPathForContract("0_1_7", "Foo"), "src/generated/0_1_7/Foo.sol");
     }
 
+    /// Freezing nothing must not open a `<tag>/` dir. A repo that generates
+    /// files but pins no release record still calls freeze via `cut`, and an
+    /// empty dir named for a release that froze nothing is exactly the stray
+    /// per-release slot the tag scheme exists to avoid.
+    function testFreezeNothingOpensNoTagDir() external {
+        string memory dir = LibSnapshot.dirForTag(LibSnapshot.deployTag(vm));
+        assertFalse(vm.exists(dir), "tag dir present before");
+
+        LibSnapshot.freezeSnapshot(vm, new string[](0));
+
+        assertFalse(vm.exists(dir), "freezing nothing opened a tag dir");
+    }
+
     /// The whole freeze lifecycle, in one test on purpose: the snapshot dir is
     /// keyed off `[package].version`, so every test here would target the SAME
     /// real directory, and cheatcode filesystem writes are not reverted between

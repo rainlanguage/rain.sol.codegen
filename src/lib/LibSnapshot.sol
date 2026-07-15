@@ -75,6 +75,12 @@ library LibSnapshot {
     /// @param contractNames The contracts whose generated files (as
     /// placed by `LibFs.buildFileForContract`) form this release's record.
     function freezeSnapshot(Vm vm, string[] memory contractNames) internal {
+        // Nothing to freeze means no release record, so no `<tag>/` dir. Creating
+        // one anyway would leave an empty dir named for a release that froze
+        // nothing, which is the state the per-release tag exists to avoid.
+        if (contractNames.length == 0) {
+            return;
+        }
         string memory tag = deployTag(vm);
         //forge-lint: disable-next-line(unsafe-cheatcode)
         vm.createDir(dirForTag(tag), true);

@@ -7,12 +7,12 @@ import {LibFs} from "../src/lib/LibFs.sol";
 import {LibCodeGen} from "../src/lib/LibCodeGen.sol";
 import {CodeGennable} from "../test/concrete/CodeGennable.sol";
 
-/// @title BuildPointers
-/// @notice Script to build the pointers file for the CodeGennable contract.
+/// @title Build
+/// @notice Script to build the generated file for the CodeGennable contract.
 /// @dev This shows an example of how to use the bytes constant generation
 /// utility in LibCodeGen.
-contract BuildPointers is Script {
-    /// Builds the pointers file for the CodeGennable contract to show an example
+contract Build is Script {
+    /// Builds the generated file for the CodeGennable contract to show an example
     /// of how to use the bytes constant generation utility.
     function run() external {
         CodeGennable codeGennable = new CodeGennable();

@@ -23,6 +23,12 @@ import {LibSnapshot} from "../lib/LibSnapshot.sol";
 /// reads the record rather than needing this script to broadcast — the deploy
 /// then puts on-chain exactly the bytes that were frozen, instead of
 /// re-deriving them.
+// `build` is unimplemented on purpose: this base is published for a consumer's
+// script to complete, and slither reasons about the derived-most contract in
+// THIS repo, so it cannot see the consumers that implement it. Suppressed here
+// rather than repo-wide, so the detector still fires on a concrete contract that
+// genuinely left a function unimplemented.
+// slither-disable-next-line unimplemented-functions
 abstract contract BuildScript is Script {
     /// @notice Write this repo's generated files, e.g. via
     /// `LibFs.buildFileForContract`. Runs on both entrypoints: cutting a record

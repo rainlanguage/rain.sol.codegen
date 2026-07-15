@@ -30,9 +30,12 @@ abstract contract BuildScript is Script {
     function build() internal virtual;
 
     /// @notice The contracts whose generated files form this release's frozen
-    /// record. Empty for a repo that generates files but freezes none.
+    /// record. Defaults to none, so a repo that generates files but pins no
+    /// release record implements `build` alone and `cut` freezes nothing.
     /// @return names The contract names.
-    function snapshotContractNames() internal view virtual returns (string[] memory names);
+    function snapshotContractNames() internal view virtual returns (string[] memory names) {
+        names = new string[](0);
+    }
 
     /// @notice Freeze this release's record. Virtual only so tests can observe
     /// the dispatch; consumers are not expected to override it.

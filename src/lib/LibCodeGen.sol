@@ -257,4 +257,33 @@ library LibCodeGen {
             ";\n"
         );
     }
+
+    /// Generates a Solidity address constant declaration string. Wraps the
+    /// literal in `address(...)` so the generated source is explicit about the
+    /// type rather than relying on a bare hex literal being inferred.
+    /// @param vm The Vm instance for file operations.
+    /// @param comment The comment to include above the constant declaration.
+    /// @param name The name of the constant.
+    /// @param data The address for the constant.
+    /// @return A string containing the Solidity code for the address constant.
+    function addressConstantString(Vm vm, string memory comment, string memory name, address data)
+        internal
+        pure
+        returns (string memory)
+    {
+        string memory addressString = vm.toString(data);
+        return string.concat(
+            "\n",
+            comment,
+            "\naddress constant ",
+            name,
+            " =",
+            17 + bytes(name).length + 2 + 1 + 8 + bytes(addressString).length + 2 > MAX_LINE_LENGTH
+                ? NEWLINE_DUE_TO_MAX_LENGTH
+                : " ",
+            "address(",
+            addressString,
+            ");\n"
+        );
+    }
 }

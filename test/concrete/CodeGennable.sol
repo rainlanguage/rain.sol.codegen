@@ -3,6 +3,6 @@
 pragma solidity =0.8.25;
 
 /// @title CodeGennable
-/// An empty contract used by `script/BuildPointers.sol` as a way to show an
+/// An empty contract used by `script/Build.sol` as a way to show an
 /// example of the code generation capabilities of this repo.
 contract CodeGennable {}

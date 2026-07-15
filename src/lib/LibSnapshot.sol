@@ -6,7 +6,7 @@ import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 import {LibFs} from "./LibFs.sol";
 
 /// @title LibSnapshot
-/// @notice Freezes generated pointers files into per-release snapshots under
+/// @notice Freezes generated files into per-release snapshots under
 /// `src/generated/<tag>/`, so every published release keeps an immutable record
 /// of its own deployment that consumers of that release can pin against, even
 /// after the current generated files advance to a newer release.
@@ -47,7 +47,7 @@ library LibSnapshot {
         return string.concat("src/generated/", tag);
     }
 
-    /// @notice The path of a contract's frozen pointers file within a release's
+    /// @notice The path of a contract's frozen generated file within a release's
     /// snapshot. Mirrors `LibFs.pathForContract` one directory deeper.
     /// @param tag The release tag, as returned by `deployTag`.
     /// @param contractName The name of the contract.
@@ -57,10 +57,10 @@ library LibSnapshot {
         pure
         returns (string memory)
     {
-        return string.concat(dirForTag(tag), "/", contractName, ".pointers.sol");
+        return string.concat(dirForTag(tag), "/", contractName, ".sol");
     }
 
-    /// @notice Freeze the current generated pointers files into this release's
+    /// @notice Freeze the current generated files into this release's
     /// snapshot dir. Only the CURRENT `deployTag` dir is ever written — older
     /// releases' snapshots are never touched.
     ///
@@ -72,7 +72,7 @@ library LibSnapshot {
     /// of the already-published release pin against.
     ///
     /// @param vm The Vm instance for file operations.
-    /// @param contractNames The contracts whose generated pointers files (as
+    /// @param contractNames The contracts whose generated files (as
     /// placed by `LibFs.buildFileForContract`) form this release's record.
     function freezeSnapshot(Vm vm, string[] memory contractNames) internal {
         string memory tag = deployTag(vm);

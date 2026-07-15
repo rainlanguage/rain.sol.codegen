@@ -10,12 +10,11 @@ import {LibCodeGen} from "./LibCodeGen.sol";
 /// @dev Uses foundry's Vm cheat codes for file operations. Notably standardizes
 /// the placement and idempotent creation of generated files.
 library LibFs {
-    /// @notice Constructs the file path for a generated contract's pointers
-    /// file.
+    /// @notice Constructs the file path for a contract's generated file.
     /// @param contractName The name of the contract.
     /// @return The file path as a string.
     function pathForContract(string memory contractName) internal pure returns (string memory) {
-        return string.concat("src/generated/", contractName, ".pointers.sol");
+        return string.concat("src/generated/", contractName, ".sol");
     }
 
     /// @notice Builds a file for a generated contract, removing any existing

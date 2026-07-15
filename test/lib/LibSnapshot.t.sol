@@ -8,7 +8,7 @@ import {LibFs} from "src/lib/LibFs.sol";
 
 /// @title LibSnapshotTest
 /// @notice Exercises the per-release snapshot freeze against this repo's own
-/// committed codegen example (`src/generated/CodeGennable.pointers.sol`). Each
+/// committed codegen example (`src/generated/CodeGennable.sol`). Each
 /// test removes the tag dir it creates so the working tree stays clean.
 contract LibSnapshotTest is Test {
     string internal constant EXAMPLE = "CodeGennable";
@@ -40,7 +40,7 @@ contract LibSnapshotTest is Test {
 
     function testDirAndPathForTag() external pure {
         assertEq(LibSnapshot.dirForTag("0_1_7"), "src/generated/0_1_7");
-        assertEq(LibSnapshot.frozenPathForContract("0_1_7", "Foo"), "src/generated/0_1_7/Foo.pointers.sol");
+        assertEq(LibSnapshot.frozenPathForContract("0_1_7", "Foo"), "src/generated/0_1_7/Foo.sol");
     }
 
     /// The whole freeze lifecycle, in one test on purpose: the snapshot dir is
@@ -48,7 +48,7 @@ contract LibSnapshotTest is Test {
     /// real directory, and cheatcode filesystem writes are not reverted between
     /// tests. Splitting these would race on shared state rather than isolate.
     ///
-    /// Covers: freezing copies the generated pointers file in byte for byte; an
+    /// Covers: freezing copies the generated file in byte for byte; an
     /// IDENTICAL re-freeze is a harmless no-op; and the guard — if the generated
     /// output would change without a `[package].version` bump, freezing REVERTS
     /// rather than silently rewriting the record that consumers of the published

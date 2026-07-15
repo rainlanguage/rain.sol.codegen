@@ -65,12 +65,56 @@ library LibSnapshot {
                 "DEPLOYED_ADDRESS",
                 deployed
             ),
+            LibCodeGen.bytes32ConstantString(
+                vm,
+                "/// @dev Hash of the runtime bytecode: the deployment's identity.\n"
+                "/// Lets a consumer verify what is deployed at the address without\n"
+                "/// loading and hashing the runtime bytecode itself.",
+                "RUNTIME_CODE_HASH",
+                deployed.codehash
+            ),
+            LibCodeGen.bytes32ConstantString(
+                vm,
+                "/// @dev Hash of the creation bytecode. This is what a CREATE2 address\n"
+                "/// derives from, so a consumer can verify the address without loading\n"
+                "/// and hashing the creation bytecode itself.",
+                "CREATION_CODE_HASH",
+                keccak256(creationCode)
+            ),
             LibCodeGen.bytesConstantString(
                 vm, "/// @dev The creation bytecode of the contract.", "CREATION_CODE", creationCode
             ),
             LibCodeGen.bytesConstantString(
                 vm, "/// @dev The runtime bytecode of the contract.", "RUNTIME_CODE", deployed.code
             )
+        );
+    }
+
+    /// @notice Build the complete deployment-record file for one deployable.
+    ///
+    /// Prefer this over calling `LibFs.buildFileForContract` with
+    /// `deployRecordString` by hand: it passes `deployed` to `LibFs` ITSELF, so
+    /// the prepended `BYTECODE_HASH` is always the real runtime codehash. A
+    /// caller wiring those two together manually can pass `address(0)` and emit
+    /// `BYTECODE_HASH = 0` — which is worse than omitting it, since a consumer
+    /// importing that constant silently compares against nothing.
+    ///
+    /// @param vm The Vm instance.
+    /// @param contractName The contract the record describes.
+    /// @param creationCode The creation bytecode it is deployed from.
+    /// @param deployed The address it deterministically deploys to, already
+    /// deployed so its runtime code can be read.
+    /// @param extraBody Additional generated content appended after the record
+    /// (parse meta, function pointers). Empty for a plain deployable.
+    function buildDeployRecordForContract(
+        Vm vm,
+        string memory contractName,
+        bytes memory creationCode,
+        address deployed,
+        string memory extraBody
+    ) internal {
+        LibFs.buildFileForContract(
+            vm, deployed, contractName, string.concat(deployRecordString(vm, creationCode, deployed), extraBody)
         );
     }
 

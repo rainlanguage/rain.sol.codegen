@@ -258,6 +258,35 @@ library LibCodeGen {
         );
     }
 
+    /// Generates a Solidity bytes32 constant declaration string. Wraps the
+    /// literal in `bytes32(...)` so the generated source is explicit about the
+    /// type rather than relying on a bare hex literal being inferred.
+    /// @param vm The Vm instance for file operations.
+    /// @param comment The comment to include above the constant declaration.
+    /// @param name The name of the constant.
+    /// @param data The bytes32 value for the constant.
+    /// @return A string containing the Solidity code for the bytes32 constant.
+    function bytes32ConstantString(Vm vm, string memory comment, string memory name, bytes32 data)
+        internal
+        pure
+        returns (string memory)
+    {
+        string memory hexString = vm.toString(data);
+        return string.concat(
+            "\n",
+            comment,
+            "\nbytes32 constant ",
+            name,
+            " =",
+            17 + bytes(name).length + 2 + 1 + 8 + bytes(hexString).length + 2 > MAX_LINE_LENGTH
+                ? NEWLINE_DUE_TO_MAX_LENGTH
+                : " ",
+            "bytes32(",
+            hexString,
+            ");\n"
+        );
+    }
+
     /// Generates a Solidity address constant declaration string. Wraps the
     /// literal in `address(...)` so the generated source is explicit about the
     /// type rather than relying on a bare hex literal being inferred.

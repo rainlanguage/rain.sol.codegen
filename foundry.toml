@@ -27,7 +27,10 @@ cbor_metadata = false
 
 evm_version = "cancun"
 
-fs_permissions = [{ access = "read-write", path = "src/generated" }]
+fs_permissions = [
+  { access = "read", path = "foundry.toml" },
+  { access = "read-write", path = "src/generated" },
+]
 
 [fuzz]
 runs = 2048

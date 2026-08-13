@@ -20,12 +20,6 @@ contract LibCodeGenFilePrefixTest is Test {
     /// change here rewrites committed files org wide. Pinned exactly so that
     /// lands as a deliberate, reviewable diff rather than a surprise on the
     /// next regeneration.
-    ///
-    /// It says nothing about why the file is committed. Generated files are
-    /// committed; that is a fact about the repo rather than something each file
-    /// argues, and the circular-dependency explanation this used to carry was
-    /// true of a pointers file and false of an alias lib, which is committed
-    /// because it IS the source consumers import.
     function testFilePrefixExact() external pure {
         //REUSE-IgnoreStart
         assertEq(

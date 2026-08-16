@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {IIntegrityToolingV1} from "src/interface/IIntegrityToolingV1.sol";
-import {ConformingToolingMock} from "test/concrete/ConformingToolingMock.sol";
+import {ToolingMock} from "test/concrete/ToolingMock.sol";
 
 /// @dev The ERC-165 id of `IIntegrityToolingV1` as published. Deployed contracts
 /// advertise this value and answer `supportsInterface` for it alone, so an
@@ -24,12 +24,18 @@ contract IIntegrityToolingV1Test is Test {
         assertEq(bytes32(type(IIntegrityToolingV1).interfaceId), bytes32(I_INTEGRITY_TOOLING_V1_INTERFACE_ID));
     }
 
-    /// A contract that inherits the interface answers the builder at the
-    /// interface's own selector, with the value that instance was given rather
-    /// than with any other builder's answer.
-    function testIIntegrityToolingV1ConformingImplementation(bytes memory pointers, bytes memory other) external {
+    /// `ToolingMock` reaches the interface type by assignment rather than by a
+    /// cast through `address`, so this compiles only while the mock inherits the
+    /// interface, and the mock compiles only while it implements the builder
+    /// with the name, arguments, return type and state mutability the interface
+    /// declares. The answer then travels the interface's own selector and return
+    /// decoding, and is this builder's rather than any other builder's on the
+    /// same instance.
+    function testIIntegrityToolingV1ImplementedByToolingMock(bytes memory pointers, bytes memory other) external {
         vm.assume(keccak256(pointers) != keccak256(other));
-        ConformingToolingMock mock = new ConformingToolingMock(other, pointers);
-        assertEq(IIntegrityToolingV1(address(mock)).buildIntegrityFunctionPointers(), pointers);
+        ToolingMock mock = new ToolingMock();
+        mock.setAll(other, other, other, other, pointers);
+        IIntegrityToolingV1 tooling = mock;
+        assertEq(tooling.buildIntegrityFunctionPointers(), pointers);
     }
 }

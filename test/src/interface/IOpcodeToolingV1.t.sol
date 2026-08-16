@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {IOpcodeToolingV1} from "src/interface/IOpcodeToolingV1.sol";
-import {ConformingToolingMock} from "test/concrete/ConformingToolingMock.sol";
+import {ToolingMock} from "test/concrete/ToolingMock.sol";
 
 /// @dev The ERC-165 id of `IOpcodeToolingV1` as published. Deployed contracts
 /// advertise this value and answer `supportsInterface` for it alone, so an
@@ -24,12 +24,18 @@ contract IOpcodeToolingV1Test is Test {
         assertEq(bytes32(type(IOpcodeToolingV1).interfaceId), bytes32(I_OPCODE_TOOLING_V1_INTERFACE_ID));
     }
 
-    /// A contract that inherits the interface answers the builder at the
-    /// interface's own selector, with the value that instance was given rather
-    /// than with any other builder's answer.
-    function testIOpcodeToolingV1ConformingImplementation(bytes memory pointers, bytes memory other) external {
+    /// `ToolingMock` reaches the interface type by assignment rather than by a
+    /// cast through `address`, so this compiles only while the mock inherits the
+    /// interface, and the mock compiles only while it implements the builder
+    /// with the name, arguments, return type and state mutability the interface
+    /// declares. The answer then travels the interface's own selector and return
+    /// decoding, and is this builder's rather than any other builder's on the
+    /// same instance.
+    function testIOpcodeToolingV1ImplementedByToolingMock(bytes memory pointers, bytes memory other) external {
         vm.assume(keccak256(pointers) != keccak256(other));
-        ConformingToolingMock mock = new ConformingToolingMock(pointers, other);
-        assertEq(IOpcodeToolingV1(address(mock)).buildOpcodeFunctionPointers(), pointers);
+        ToolingMock mock = new ToolingMock();
+        mock.setAll(pointers, other, other, other, other);
+        IOpcodeToolingV1 tooling = mock;
+        assertEq(tooling.buildOpcodeFunctionPointers(), pointers);
     }
 }

@@ -4,11 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {IParserToolingV1} from "src/interface/IParserToolingV1.sol";
-import {
-    ConformingToolingMock,
-    CONFORMING_LITERAL_PARSER_FUNCTION_POINTERS,
-    CONFORMING_OPERAND_HANDLER_FUNCTION_POINTERS
-} from "test/concrete/ConformingToolingMock.sol";
+import {ToolingMock} from "test/concrete/ToolingMock.sol";
 
 /// @dev The ERC-165 id of `IParserToolingV1` as published. Deployed contracts
 /// advertise this value and answer `supportsInterface` for it alone, so an
@@ -25,27 +21,31 @@ contract IParserToolingV1Test is Test {
     /// itself, so a change to the interface's function set moves the id off the
     /// literal instead of carrying the literal along with it. This is the one id
     /// of the four that is an exclusive or of two selectors rather than a single
-    /// selector, so it moves when either builder's name or arguments change and
-    /// stays put when the two builders exchange names with each other.
+    /// selector, so it moves when either builder's name or arguments change, and
+    /// it says nothing about which of the two selectors carries which meaning.
     function testIParserToolingV1InterfaceId() external pure {
         assertEq(bytes32(type(IParserToolingV1).interfaceId), bytes32(I_PARSER_TOOLING_V1_INTERFACE_ID));
     }
 
-    /// A contract that inherits the interface answers both builders at the
-    /// interface's own selectors, each with its own answer rather than with the
-    /// other's, and with the same answer whatever the instance was constructed
-    /// with, which is all a `pure` builder is able to do.
-    function testIParserToolingV1ConformingImplementation(bytes memory opcodePointers, bytes memory integrityPointers)
-        external
-    {
-        ConformingToolingMock mock = new ConformingToolingMock(opcodePointers, integrityPointers);
-        assertEq(
-            IParserToolingV1(address(mock)).buildLiteralParserFunctionPointers(),
-            CONFORMING_LITERAL_PARSER_FUNCTION_POINTERS
-        );
-        assertEq(
-            IParserToolingV1(address(mock)).buildOperandHandlerFunctionPointers(),
-            CONFORMING_OPERAND_HANDLER_FUNCTION_POINTERS
-        );
+    /// `ToolingMock` reaches the interface type by assignment rather than by a
+    /// cast through `address`, so this compiles only while the mock inherits the
+    /// interface, and the mock compiles only while it implements both builders
+    /// with the names, arguments, return types and state mutabilities the
+    /// interface declares. Each answer then travels its own builder's selector
+    /// and return decoding, so the two selectors the id exclusive-ors together
+    /// are held apart here even though the id itself cannot tell them apart.
+    function testIParserToolingV1ImplementedByToolingMock(
+        bytes memory literalParserFunctionPointers,
+        bytes memory operandHandlerFunctionPointers,
+        bytes memory other
+    ) external {
+        vm.assume(keccak256(literalParserFunctionPointers) != keccak256(operandHandlerFunctionPointers));
+        vm.assume(keccak256(literalParserFunctionPointers) != keccak256(other));
+        vm.assume(keccak256(operandHandlerFunctionPointers) != keccak256(other));
+        ToolingMock mock = new ToolingMock();
+        mock.setAll(other, literalParserFunctionPointers, operandHandlerFunctionPointers, other, other);
+        IParserToolingV1 tooling = mock;
+        assertEq(tooling.buildLiteralParserFunctionPointers(), literalParserFunctionPointers);
+        assertEq(tooling.buildOperandHandlerFunctionPointers(), operandHandlerFunctionPointers);
     }
 }

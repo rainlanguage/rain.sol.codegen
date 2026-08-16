@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {ISubParserToolingV1} from "src/interface/ISubParserToolingV1.sol";
-import {ConformingToolingMock, CONFORMING_SUB_PARSER_WORD_PARSERS} from "test/concrete/ConformingToolingMock.sol";
+import {ToolingMock} from "test/concrete/ToolingMock.sol";
 
 /// @dev The ERC-165 id of `ISubParserToolingV1` as published. Deployed contracts
 /// advertise this value and answer `supportsInterface` for it alone, so an
@@ -24,15 +24,18 @@ contract ISubParserToolingV1Test is Test {
         assertEq(bytes32(type(ISubParserToolingV1).interfaceId), bytes32(I_SUB_PARSER_TOOLING_V1_INTERFACE_ID));
     }
 
-    /// A contract that inherits the interface answers the builder at the
-    /// interface's own selector, with its own answer rather than with another
-    /// builder's, and with the same answer whatever the instance was constructed
-    /// with, which is all a `pure` builder is able to do.
-    function testISubParserToolingV1ConformingImplementation(
-        bytes memory opcodePointers,
-        bytes memory integrityPointers
-    ) external {
-        ConformingToolingMock mock = new ConformingToolingMock(opcodePointers, integrityPointers);
-        assertEq(ISubParserToolingV1(address(mock)).buildSubParserWordParsers(), CONFORMING_SUB_PARSER_WORD_PARSERS);
+    /// `ToolingMock` reaches the interface type by assignment rather than by a
+    /// cast through `address`, so this compiles only while the mock inherits the
+    /// interface, and the mock compiles only while it implements the builder
+    /// with the name, arguments, return type and state mutability the interface
+    /// declares. The answer then travels the interface's own selector and return
+    /// decoding, and is this builder's rather than any other builder's on the
+    /// same instance.
+    function testISubParserToolingV1ImplementedByToolingMock(bytes memory wordParsers, bytes memory other) external {
+        vm.assume(keccak256(wordParsers) != keccak256(other));
+        ToolingMock mock = new ToolingMock();
+        mock.setAll(other, other, other, wordParsers, other);
+        ISubParserToolingV1 tooling = mock;
+        assertEq(tooling.buildSubParserWordParsers(), wordParsers);
     }
 }

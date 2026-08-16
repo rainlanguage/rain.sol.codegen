@@ -31,8 +31,23 @@ library LibFs {
     /// @param contractName The name of the contract, interpolated verbatim.
     /// @return The file path as a string.
     function pathForContract(string memory contractName) internal pure returns (string memory) {
+        return pathForContractIn(GENERATED_DIR, contractName);
+    }
+
+    /// @notice Constructs the file path for a contract's generated file inside
+    /// `dir`.
+    ///
+    /// Reverts unless `contractName` is a Solidity identifier, so the returned
+    /// path is a direct child of `dir` for every name that is accepted at all.
+    /// `dir` is interpolated verbatim and is not checked, so where `dir` itself
+    /// sits is entirely the caller's, and only `fs_permissions` confines it.
+    /// @param dir The directory to put the file in, without a trailing
+    /// separator, interpolated verbatim.
+    /// @param contractName The name of the contract, interpolated verbatim.
+    /// @return The file path as a string.
+    function pathForContractIn(string memory dir, string memory contractName) private pure returns (string memory) {
         LibCodeGen.requireContractName(contractName);
-        return string.concat(GENERATED_DIR, "/", contractName, ".sol");
+        return string.concat(dir, "/", contractName, ".sol");
     }
 
     /// @notice Builds a file for a generated contract at
@@ -43,8 +58,9 @@ library LibFs {
     /// of `GENERATED_DIR` and a rejected name reverts before any cheatcode is
     /// reached.
     ///
-    /// `GENERATED_DIR` is created if it does not exist, so the first generation
-    /// in a repo does not need it committed already.
+    /// `GENERATED_DIR` is created if it does not exist, along with any missing
+    /// parent of it, so the first generation in a repo does not need it
+    /// committed already.
     ///
     /// Anything already at the path is unlinked before the write, so a symlink
     /// there is replaced by a regular file rather than written through to its
@@ -62,9 +78,36 @@ library LibFs {
     /// @param contractName The name of the contract.
     /// @param body The body of the contract file to be written.
     function buildFileForContract(Vm vm, address instance, string memory contractName, string memory body) internal {
-        string memory path = pathForContract(contractName);
+        buildFileForContract(vm, instance, GENERATED_DIR, contractName, body);
+    }
+
+    /// @notice Builds a file for a generated contract inside `dir` rather than
+    /// inside `GENERATED_DIR`.
+    ///
+    /// Identical to `buildFileForContract` in every other respect, and that
+    /// function is this one applied to `GENERATED_DIR`: `dir` is what gets
+    /// created when it is missing, and what the file is written a direct child
+    /// of. `dir` is not checked, so a caller passing something other than a
+    /// directory it means to own gets whatever `fs_permissions` allows;
+    /// `contractName` is still required to be a Solidity identifier, so the
+    /// name can never carry the file out of `dir`.
+    /// @param vm The Vm instance for file operations.
+    /// @param instance The contract instance whose bytecode hash is to be
+    /// included.
+    /// @param dir The directory to put the file in, without a trailing
+    /// separator, interpolated verbatim.
+    /// @param contractName The name of the contract.
+    /// @param body The body of the contract file to be written.
+    function buildFileForContract(
+        Vm vm,
+        address instance,
+        string memory dir,
+        string memory contractName,
+        string memory body
+    ) internal {
+        string memory path = pathForContractIn(dir, contractName);
         //forge-lint: disable-next-line(unsafe-cheatcode)
-        vm.createDir(GENERATED_DIR, true);
+        vm.createDir(dir, true);
         if (vm.exists(path)) {
             //forge-lint: disable-next-line(unsafe-cheatcode)
             vm.removeFile(path);

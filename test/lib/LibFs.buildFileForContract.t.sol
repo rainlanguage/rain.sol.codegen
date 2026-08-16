@@ -257,6 +257,34 @@ contract LibFsBuildFileForContractTest is Test {
         }
     }
 
+    /// The directory is created when it is not there, so a repo generating for
+    /// the first time does not have to commit it. Two levels of it are missing,
+    /// so a create that did not also make the missing parent fails here.
+    ///
+    /// Driven through a directory this test owns rather than through
+    /// `src/generated` itself. The tests in this file run in parallel and every
+    /// one of them writes under `src/generated`, so removing it to make it
+    /// missing races all of them, and takes the committed
+    /// `src/generated/CodeGennable.sol` with it for as long as it is gone.
+    function testBuildFileForContractCreatesTheDirectory() external {
+        string memory root = "src/generated/LibFsBuildCreatesDir";
+        string memory dir = "src/generated/LibFsBuildCreatesDir/nested";
+        string memory name = "LibFsBuildCreatesDir";
+        cleanupPath(root);
+        assertFalse(vm.exists(root), "dirty precondition");
+        address instance = address(new CodeGennable());
+        string memory body = "\n// created\n";
+
+        LibFs.buildFileForContract(vm, instance, dir, name, body);
+
+        assertTrue(vm.isDir(dir), "the directory was not created");
+        assertEq(
+            vm.readFile("src/generated/LibFsBuildCreatesDir/nested/LibFsBuildCreatesDir.sol"),
+            expectedFile(instance, body)
+        );
+        cleanupPath(root);
+    }
+
     /// A name that is not a Solidity identifier gets no path from
     /// `pathForContract`, and `buildFileForContract` asks for the path before it
     /// reaches a cheatcode, so the refusal arrives before anything is written.

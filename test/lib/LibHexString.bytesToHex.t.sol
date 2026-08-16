@@ -370,9 +370,32 @@ contract LibHexStringBytesToHexTest is Test {
     /// with its first two characters removed. Conformance is derived here from
     /// the definition of `toString(bytes)` rather than read back off the
     /// library, so nothing gets through that does not match the definition.
-    function testBytesToHexRejectsEveryNonConformingVmOutput(bytes memory data, string memory toStringReturn) external {
+    ///
+    /// A string that is `0x` followed by exactly two characters per input byte
+    /// is a vanishing fraction of all strings, so the accepted half of the
+    /// property is CONSTRUCTED against the fuzzed data rather than waited for:
+    /// an unconstructed return conforms 0 times in 2048 runs. `conforming`
+    /// picks which half of the property a run aims at, and the payload is
+    /// filled from `filler` so that an accepted string is arbitrary in
+    /// everything except the length and prefix the library actually checks.
+    /// Whether a string conforms is still read off its own characters below, so
+    /// a `filler` that happens to conform is checked against the accepted half
+    /// rather than expected to revert.
+    function testBytesToHexStripsOrRevertsForEveryVmOutput(bytes memory data, string memory filler, bool conforming)
+        external
+    {
+        string memory toStringReturn = filler;
+        if (conforming) {
+            bytes memory fillerBytes = bytes(filler);
+            bytes memory payload = new bytes(data.length * 2);
+            for (uint256 i = 0; i < payload.length; i++) {
+                payload[i] = fillerBytes.length == 0 ? bytes1("a") : fillerBytes[i % fillerBytes.length];
+            }
+            toStringReturn = string.concat("0x", string(payload));
+        }
+
         LibHexStringExternal external_ = new LibHexStringExternal();
-        Vm badVm = Vm(address(new NonConformingVm(toStringReturn)));
+        Vm stubVm = Vm(address(new NonConformingVm(toStringReturn)));
 
         bytes memory returned = bytes(toStringReturn);
         uint256 expectedLength = data.length * 2 + 2;
@@ -385,10 +408,10 @@ contract LibHexStringBytesToHexTest is Test {
             for (uint256 i = 2; i < returned.length; i++) {
                 expected[i - 2] = returned[i];
             }
-            assertEq(external_.bytesToHex(badVm, data), string(expected));
+            assertEq(external_.bytesToHex(stubVm, data), string(expected));
         } else {
             vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, toStringReturn, expectedLength));
-            external_.bytesToHex(badVm, data);
+            external_.bytesToHex(stubVm, data);
         }
     }
 }

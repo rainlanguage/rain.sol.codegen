@@ -5,7 +5,7 @@ pragma solidity =0.8.25;
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibFs} from "src/lib/LibFs.sol";
 import {LibCodeGen, InvalidContractName} from "src/lib/LibCodeGen.sol";
-import {CodeGennable} from "test/concrete/CodeGennable.sol";
+import {CodeGennable} from "src/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 

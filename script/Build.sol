@@ -5,7 +5,7 @@ pragma solidity =0.8.25;
 import {Script} from "forge-std-1.16.1/src/Script.sol";
 import {LibFs} from "../src/lib/LibFs.sol";
 import {LibCodeGen} from "../src/lib/LibCodeGen.sol";
-import {CodeGennable} from "../test/concrete/CodeGennable.sol";
+import {CodeGennable} from "../src/concrete/CodeGennable.sol";
 
 /// @title Build
 /// @notice Script to build the generated file for the CodeGennable contract.

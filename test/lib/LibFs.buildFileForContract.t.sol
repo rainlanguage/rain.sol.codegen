@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibFs} from "src/lib/LibFs.sol";
-import {LibCodeGen, InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
@@ -264,7 +264,7 @@ contract LibFsBuildFileForContractTest is Test {
     /// asserted here is that the write inherits it, and that nothing lands on
     /// disk when it does.
     function assertNameRejected(string memory contractName) internal {
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, contractName));
+        vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, contractName));
         iExternal.buildFileForContract(vm, address(this), contractName, "");
     }
 
@@ -308,7 +308,7 @@ contract LibFsBuildFileForContractTest is Test {
     /// ones named above.
     function testBuildFileForContractRejectsEveryNonIdentifierName(bytes memory nameBytes) external {
         string memory contractName = string(nameBytes);
-        vm.assume(!LibCodeGenSlow.isContractNameSlow(contractName));
+        vm.assume(!LibCodeGenSlow.isIdentifierSlow(contractName));
         assertNameRejected(contractName);
     }
 }

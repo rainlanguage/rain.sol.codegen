@@ -3,35 +3,36 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibCodeGen, InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {LibCodeGenSlow, SLOW_HEAD_ALPHABET, SLOW_TAIL_ALPHABET} from "test/lib/LibCodeGenSlow.sol";
 
-/// @title LibCodeGenRequireContractNameTest
-/// @notice `requireContractName` is what stands between a caller supplied
-/// contract name and a filesystem path built out of it. The rule it enforces is
-/// the Solidity identifier: that is what a contract name is, and it is also a
-/// character set that cannot express a path separator, a parent directory or an
-/// empty basename.
-contract LibCodeGenRequireContractNameTest is Test {
+/// @title LibCodeGenRequireIdentifierTest
+/// @notice `requireIdentifier` is what stands between a caller supplied name and
+/// the filesystem path or the generated declaration built out of it. The rule it
+/// enforces is the Solidity identifier: that is what a contract name and a
+/// constant name both are, and it is also a character set that cannot express a
+/// path separator, a parent directory, an empty basename, or a character that
+/// ends one declaration and starts another.
+contract LibCodeGenRequireIdentifierTest is Test {
     /// Reachable only through an external call so that the revert can be caught
     /// rather than aborting the test.
-    function callRequireContractName(string memory name) external pure {
-        LibCodeGen.requireContractName(name);
+    function callRequireIdentifier(string memory name) external pure {
+        LibCodeGen.requireIdentifier(name);
     }
 
     function assertAccepted(string memory name) internal view {
-        this.callRequireContractName(name);
+        this.callRequireIdentifier(name);
     }
 
     function assertRejected(string memory name) internal {
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, name));
-        this.callRequireContractName(name);
+        vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, name));
+        this.callRequireIdentifier(name);
     }
 
     /// The names real consumers pass. Every `script/Build.sol` in the Rain org
     /// passes the concrete contract's own name, so these are the shape that must
     /// keep working.
-    function testRequireContractNameAcceptsContractNames() external view {
+    function testRequireIdentifierAcceptsContractNames() external view {
         assertAccepted("CodeGennable");
         assertAccepted("PythWords");
         assertAccepted("RaindexV6SubParser");
@@ -41,7 +42,7 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// Every character class Solidity allows in an identifier, at both the first
     /// position and a later one, so the rule is Solidity's rather than a
     /// narrower guess at it.
-    function testRequireContractNameAcceptsIdentifierCharacters() external view {
+    function testRequireIdentifierAcceptsIdentifierCharacters() external view {
         assertAccepted("A");
         assertAccepted("z");
         assertAccepted("_");
@@ -64,7 +65,7 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// the ranges they sit against, because a name has to be an identifier
     /// apart from the one character under test for the boundary to be what
     /// decides it.
-    function testRequireContractNameRangeBoundaries() external {
+    function testRequireIdentifierRangeBoundaries() external {
         assertAccepted("A");
         assertAccepted("Z");
         assertAccepted("a");
@@ -82,13 +83,13 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// An empty name would build `src/generated/.sol` and `meta/.rain.meta`:
     /// hidden dotfiles that no compiler picks up and `ls` does not show, written
     /// with a success report.
-    function testRequireContractNameRejectsEmpty() external {
+    function testRequireIdentifierRejectsEmpty() external {
         assertRejected("");
     }
 
     /// A digit cannot open a Solidity identifier, so it cannot open a contract
     /// name either.
-    function testRequireContractNameRejectsLeadingDigit() external {
+    function testRequireIdentifierRejectsLeadingDigit() external {
         assertRejected("0Foo");
         assertRejected("9");
     }
@@ -96,7 +97,7 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// A separator would target a subdirectory, and `..` would escape the
     /// generated directory entirely. Both are refused by the character rule
     /// rather than by a special case for them.
-    function testRequireContractNameRejectsPathCharacters() external {
+    function testRequireIdentifierRejectsPathCharacters() external {
         assertRejected("sub/Foo");
         assertRejected("..");
         assertRejected(".");
@@ -110,7 +111,7 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// A name that is otherwise fine but carries anything outside the identifier
     /// set is refused. A dot in particular would collide with the extension the
     /// caller appends.
-    function testRequireContractNameRejectsOtherCharacters() external {
+    function testRequireIdentifierRejectsOtherCharacters() external {
         assertRejected("Foo.sol");
         assertRejected("Foo Bar");
         assertRejected("Foo-Bar");
@@ -121,16 +122,16 @@ contract LibCodeGenRequireContractNameTest is Test {
 
     /// The rejection carries the name that was rejected, so a build script that
     /// generates many files says which one it choked on.
-    function testRequireContractNameErrorCarriesTheName() external {
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, "sub/Foo"));
-        this.callRequireContractName("sub/Foo");
+    function testRequireIdentifierErrorCarriesTheName() external {
+        vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, "sub/Foo"));
+        this.callRequireIdentifier("sub/Foo");
     }
 
     /// Accepting a name is exactly accepting every one of its bytes, so an
     /// accepted name can be rebuilt from the identifier alphabet and nothing
     /// else. Fuzzed so that the check is not merely rejecting the handful of
     /// bad names spelled out above.
-    function testRequireContractNameAcceptedNamesAreIdentifiers(string memory name) external {
+    function testRequireIdentifierAcceptedNamesAreIdentifiers(string memory name) external {
         bytes memory nameBytes = bytes(name);
         bool expectedValid = nameBytes.length > 0;
         for (uint256 i = 0; i < nameBytes.length; i++) {
@@ -145,10 +146,10 @@ contract LibCodeGenRequireContractNameTest is Test {
         }
 
         if (expectedValid) {
-            this.callRequireContractName(name);
+            this.callRequireIdentifier(name);
         } else {
-            vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, name));
-            this.callRequireContractName(name);
+            vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, name));
+            this.callRequireIdentifier(name);
         }
     }
 
@@ -156,8 +157,8 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// no accepted name can leave the directory it is interpolated into. Stated
     /// as a property of the accepted set rather than as a list of the sequences
     /// that would escape.
-    function testRequireContractNameAcceptedNamesCannotTraverse(string memory name) external {
-        try this.callRequireContractName(name) {
+    function testRequireIdentifierAcceptedNamesCannotTraverse(string memory name) external {
+        try this.callRequireIdentifier(name) {
             bytes memory nameBytes = bytes(name);
             assertGt(nameBytes.length, 0, "empty name accepted");
             for (uint256 i = 0; i < nameBytes.length; i++) {
@@ -174,7 +175,7 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// accepted ranges is left to a chosen example, and the oracle is the
     /// alphabet written out character by character rather than the same range
     /// arithmetic the library uses.
-    function testRequireContractNameEveryLeadingByte() external {
+    function testRequireIdentifierEveryLeadingByte() external {
         for (uint256 i = 0; i < 256; i++) {
             string memory name = string(bytes.concat(bytes1(uint8(i))));
             if (LibCodeGenSlow.containsSlow(SLOW_HEAD_ALPHABET, bytes1(uint8(i)))) {
@@ -188,7 +189,7 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// Exhaustive over the trailing byte, behind a leading byte that is itself
     /// accepted. The digits separate this from the leading case: they are
     /// accepted here and rejected there.
-    function testRequireContractNameEveryTrailingByte() external {
+    function testRequireIdentifierEveryTrailingByte() external {
         for (uint256 i = 0; i < 256; i++) {
             string memory name = string(bytes.concat(bytes("A"), bytes1(uint8(i))));
             if (LibCodeGenSlow.containsSlow(SLOW_TAIL_ALPHABET, bytes1(uint8(i)))) {
@@ -204,9 +205,9 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// character, so this fails if either end of any range moves, rather than
     /// following the library the way an inlined copy of its own arithmetic
     /// would.
-    function testRequireContractNameMatchesAlphabet(bytes memory nameBytes) external {
+    function testRequireIdentifierMatchesAlphabet(bytes memory nameBytes) external {
         string memory name = string(nameBytes);
-        if (LibCodeGenSlow.isContractNameSlow(name)) {
+        if (LibCodeGenSlow.isIdentifierSlow(name)) {
             assertAccepted(name);
         } else {
             assertRejected(name);
@@ -218,7 +219,7 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// identifier, so without constructing them the accepted half of the domain
     /// is never exercised at all and a check that rejected everything would
     /// still pass.
-    function testRequireContractNameAcceptsGeneratedIdentifiers(bytes memory seed) external view {
+    function testRequireIdentifierAcceptsGeneratedIdentifiers(bytes memory seed) external view {
         string memory name = LibCodeGenSlow.nameFromSeedSlow(seed);
         assertTrue(bytes(name).length > 0, "generated an empty name");
         assertAccepted(name);
@@ -227,7 +228,7 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// A single byte outside the alphabet is enough to reject a name that is
     /// otherwise an identifier, wherever in the name it sits. A check that only
     /// looked at the first or the last character would pass this.
-    function testRequireContractNameRejectsOneBadByte(bytes memory seed, uint256 position, uint8 badByte) external {
+    function testRequireIdentifierRejectsOneBadByte(bytes memory seed, uint256 position, uint8 badByte) external {
         bytes memory nameBytes = bytes(LibCodeGenSlow.nameFromSeedSlow(seed));
         vm.assume(!LibCodeGenSlow.containsSlow(SLOW_TAIL_ALPHABET, bytes1(badByte)));
         nameBytes[position % nameBytes.length] = bytes1(badByte);

@@ -31,7 +31,7 @@ library LibFs {
     /// @param contractName The name of the contract, interpolated verbatim.
     /// @return The file path as a string.
     function pathForContract(string memory contractName) internal pure returns (string memory) {
-        LibCodeGen.requireContractName(contractName);
+        LibCodeGen.requireIdentifier(contractName);
         return string.concat(GENERATED_DIR, "/", contractName, ".sol");
     }
 

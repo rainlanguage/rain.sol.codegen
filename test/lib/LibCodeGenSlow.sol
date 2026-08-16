@@ -151,7 +151,7 @@ library LibCodeGenSlow {
     }
 
     /// The index of the first `needle` in `haystack` at or after `from`, or
-    /// `haystack.length` when there is none. An empty `needle` is at `from`.
+    /// `haystack.length` when there is none.
     function indexOfSlow(bytes memory haystack, bytes memory needle, uint256 from) internal pure returns (uint256) {
         for (uint256 i = from; i + needle.length <= haystack.length; i++) {
             bool matched = true;

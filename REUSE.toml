@@ -15,7 +15,6 @@ path = [
   "remappings.txt",
   "slither.config.json",
   "REUSE.toml",
-  "src/lib/LibCodeGen.sol",
   "soldeer.lock",
 ]
 SPDX-FileCopyrightText = "Copyright (c) 2020 Rain Open Source Software Ltd"

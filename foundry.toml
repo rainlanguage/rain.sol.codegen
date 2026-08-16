@@ -27,8 +27,11 @@ cbor_metadata = false
 
 evm_version = "cancun"
 
+# The project is readable so that the suite can assert properties over the
+# repo's own files, including the paths REUSE.toml annotates. The longest
+# matching path wins, so `src/generated` and `meta` stay writable.
 fs_permissions = [
-  { access = "read", path = "foundry.toml" },
+  { access = "read", path = "." },
   { access = "read-write", path = "src/generated" },
   { access = "read-write", path = "meta" },
 ]

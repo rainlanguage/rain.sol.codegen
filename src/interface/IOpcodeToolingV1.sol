@@ -3,7 +3,7 @@
 pragma solidity ^0.8.25;
 
 /// @title IOpcodeToolingV1
-/// Implemented by any contract that exposes opcode functions (new words) for the
+/// @notice Implemented by any contract that exposes opcode functions (new words) for the
 /// Rain interpreter. Ostensibly this is for the interpreter itself and also
 /// extension points such as externs.
 interface IOpcodeToolingV1 {

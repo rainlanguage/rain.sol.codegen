@@ -3,7 +3,7 @@
 pragma solidity ^0.8.25;
 
 /// @title ISubParserToolingV1
-/// Implemented by any contract that exposes sub parser tooling functions for the
+/// @notice Implemented by any contract that exposes sub parser tooling functions for the
 /// Rain interpreter.
 interface ISubParserToolingV1 {
     /// Builds sub parser word parsers.

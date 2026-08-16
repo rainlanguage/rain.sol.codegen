@@ -35,6 +35,10 @@ fs_permissions = [
   { access = "read", path = "foundry.toml" },
   { access = "read-write", path = "src/generated" },
   { access = "read-write", path = "meta" },
+  # The build output, so the tests that assert emitted NatSpec can read the
+  # artifacts. Read only, because those tests assert what the compiler wrote and
+  # a write grant here would let a test author its own evidence.
+  { access = "read", path = "out" },
 ]
 
 # `LibCodeGen`'s wrap arithmetic is computed against these, so they are stated

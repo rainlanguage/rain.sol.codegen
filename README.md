@@ -5,12 +5,15 @@ Solidity-native tooling to generate Solidity source. Builds a valid `.sol` file
 function-pointer tables — needed for runtime gas efficiency in the Rain
 interpreter.
 
-Also exposes interfaces (interpreter, sub-parsers, externs) for Rain contracts
-to implement against the generated code.
+Also exposes the tooling interfaces (`IIntegrityToolingV1`, `IOpcodeToolingV1`,
+`IParserToolingV1`, `ISubParserToolingV1`) that Rain contracts implement to
+build the pointers this library caches.
 
-`script/BuildPointers.sol` is an example implementation;
-`.github/workflows/git-clean.yaml` is an example CI guard that fails when the
-committed pointer artifacts drift from a fresh regeneration.
+`script/Build.sol` is an example implementation. The name is not a free choice:
+rainix's `rainix-copy-artifacts.yaml` reusable regenerates from that exact path,
+and hard-fails any repo that commits `src/generated/` without it.
+`.github/workflows/build-pointers.yaml` wires that reusable up here, so CI fails
+when the committed generated sources drift from a fresh regeneration.
 
 Generated code is imported downstream by contracts that themselves expose
 pointers, which pointers feed back into the generation. This cycle means
@@ -31,27 +34,40 @@ This repo uses [nix](https://nixos.org/download.html). The default shell is the
 slim `sol-shell` from [rainix](https://github.com/rainlanguage/rainix).
 
 ```sh
-nix develop          # enter the shell
+nix develop           # enter the shell
 forge soldeer install # install deps declared in foundry.toml
 forge build
 ```
 
-Tasks:
+Checks, each of which CI also runs:
 
-- `rainix-sol-static` — slither
-- `rainix-sol-legal` — `reuse lint`
+- `forge test`
+- `forge fmt --check`
+- `slither .`
+- `reuse lint`
 
-This repo has no `forge test` suite — the code is tooling exercised by
-downstream consumers' generated artifacts.
+Regenerate the committed example artifact under `src/generated/`:
+
+```sh
+forge script script/Build.sol
+```
+
+On top of the above, CI applies rainix's org-wide static checks via
+[`.github/workflows/rainix.yaml`](.github/workflows/rainix.yaml).
 
 Use the nix-pinned `forge` for all development.
 
 ## Publish
 
-Tag `v<x.y.z>` on `main`. The
-[`Publish to Soldeer`](.github/workflows/publish-soldeer.yaml) wrapper delegates
-to rainix's reusable workflow, which derives the package name from the repo name
-(`rain.sol.codegen` → `rain-sol-codegen`).
+Publishing is merge-driven, not tag-driven.
+[`Package Release`](.github/workflows/package-release.yaml) calls rainix's
+`rainix-autopublish.yaml` reusable on every push to `main`, passing the package
+name explicitly as `soldeer-package: rain-sol-codegen`. When the source content
+differs from the latest published revision, that workflow pushes
+`[package].version` to Soldeer, tags `sol-v<x.y.z>`, and bumps
+`[package].version` to the next version. `[package].version` in `foundry.toml`
+is therefore the next, unpublished version rather than the last published one.
+Neither the version nor the tag is set by hand.
 
 ## License
 
@@ -60,9 +76,9 @@ DecentraLicense 1.0 (DCL-1.0) — full text in
 ([opensource.org](https://opensource.org/license/cal-1-0)) plus user-data
 disclosure obligations consistent with permissionless-blockchain assumptions.
 
-This repo is [REUSE 3.2](https://reuse.software/spec-3.2/) compliant. Verify
+This repo is [REUSE 3.3](https://reuse.software/spec-3.3/) compliant. Verify
 locally:
 
 ```sh
-nix develop -c rainix-sol-legal
+nix develop -c reuse lint
 ```

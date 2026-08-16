@@ -341,6 +341,91 @@ contract LibHexStringBytesToHexTest is Test {
         external_.bytesToHex(badVm, "");
     }
 
+    /// The payload is checked against the hexadecimal charset, not merely
+    /// counted. A return of the right length behind the right prefix whose
+    /// payload is not hexadecimal reaches generated source inside a `hex"..."`
+    /// literal that does not compile, and the compiler names the generated file
+    /// rather than the `Vm` that produced the characters.
+    function testBytesToHexRevertsOnNonHexVmOutput() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0xZZZZ")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0xZZZZ", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// `toString(bytes)` is defined to return lower case, so upper case nibbles
+    /// are a non conforming return even though they name the same bytes.
+    function testBytesToHexRevertsOnUpperCaseVmOutput() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0xAABB")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0xAABB", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// The character immediately after the prefix is checked, so a scan that
+    /// begins one character late does not accept this.
+    function testBytesToHexRevertsOnNonHexFirstPayloadCharacter() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0xZabb")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0xZabb", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// The final character of the payload is checked, so a scan that stops one
+    /// character early does not accept this.
+    function testBytesToHexRevertsOnNonHexLastPayloadCharacter() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0xaabZ")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0xaabZ", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// `/` is the character immediately below `0`, the bottom of the digit
+    /// range, so only the lower bound of that range rejects it.
+    function testBytesToHexRevertsOnCharacterBelowDigitRange() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0x/abb")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0x/abb", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// `:` is the character immediately above `9`, the top of the digit range,
+    /// so only the upper bound of that range rejects it.
+    function testBytesToHexRevertsOnCharacterAboveDigitRange() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0x:abb")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0x:abb", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// A backtick is the character immediately below `a`, the bottom of the
+    /// letter range, so only the lower bound of that range rejects it.
+    function testBytesToHexRevertsOnCharacterBelowLetterRange() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0x`abb")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0x`abb", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// `g` is the character immediately above `f`, the top of the letter range,
+    /// so only the upper bound of that range rejects it.
+    function testBytesToHexRevertsOnCharacterAboveLetterRange() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0xgabb")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0xgabb", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// Every character of the hexadecimal charset is accepted, which includes
+    /// the four that sit on the boundaries of the two accepted ranges: `0`, `9`,
+    /// `a` and `f`. The charset check narrows what is accepted, so what it must
+    /// not narrow is pinned alongside it.
+    function testBytesToHexAcceptsEveryHexNibble() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm conformingVm = Vm(address(new NonConformingVm("0x0123456789abcdef")));
+        assertEq(external_.bytesToHex(conformingVm, hex"0011223344556677"), "0123456789abcdef");
+    }
+
     /// The check gates on the shape of the returned string, not on the identity
     /// of the `Vm`. A conforming `Vm` that is not foundry's is still stripped
     /// and returned, so the guard does not quietly narrow the parameter to the
@@ -379,6 +464,13 @@ contract LibHexStringBytesToHexTest is Test {
         // The length equality implies at least 2 characters, so the prefix
         // reads only happen once indexing them is in bounds.
         bool conforms = returned.length == expectedLength && returned[0] == bytes1("0") && returned[1] == bytes1("x");
+        // `toString(bytes)` is defined to emit two lower case hexadecimal
+        // nibbles per input byte, so a payload character outside that charset is
+        // as non conforming as a wrong length or a missing prefix.
+        for (uint256 i = 2; conforms && i < returned.length; i++) {
+            uint8 c = uint8(returned[i]);
+            conforms = (c >= 0x30 && c <= 0x39) || (c >= 0x61 && c <= 0x66);
+        }
 
         if (conforms) {
             bytes memory expected = new bytes(returned.length - 2);

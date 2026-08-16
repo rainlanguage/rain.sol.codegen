@@ -23,6 +23,9 @@ contract LibCodeGenRequireContractNameTest is Test {
         this.callRequireContractName(name);
     }
 
+    /// Rejection is asserted as the whole error, selector and argument: every
+    /// rejection below pins that the revert carries the name that was rejected,
+    /// so a build script that generates many files says which one it choked on.
     function assertRejected(string memory name) internal {
         vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, name));
         this.callRequireContractName(name);
@@ -117,13 +120,6 @@ contract LibCodeGenRequireContractNameTest is Test {
         assertRejected("Foo\n");
         assertRejected(unicode"Foo€");
         assertRejected(string(hex"466f6f00"));
-    }
-
-    /// The rejection carries the name that was rejected, so a build script that
-    /// generates many files says which one it choked on.
-    function testRequireContractNameErrorCarriesTheName() external {
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, "sub/Foo"));
-        this.callRequireContractName("sub/Foo");
     }
 
     /// Accepting a name is exactly accepting every one of its bytes, so an

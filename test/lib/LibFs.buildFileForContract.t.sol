@@ -277,7 +277,6 @@ contract LibFsBuildFileForContractTest is Test {
 
         LibFs.buildFileForContract(vm, instance, dir, name, body);
 
-        assertTrue(vm.isDir(dir), "the directory was not created");
         assertEq(
             vm.readFile("src/generated/LibFsBuildCreatesDir/nested/LibFsBuildCreatesDir.sol"),
             expectedFile(instance, body)

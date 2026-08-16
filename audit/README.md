@@ -17,10 +17,9 @@ reader who needs it measures the distance themselves:
 git rev-list --count "$(jq -r '.[-1].commit' audit/mutation-test-scans.json)"..HEAD
 ```
 
-`test/audit/mutation-test-scans.t.sol` holds this file to the ordering rule: the
-ledger is non-empty, every record carries a `timestamp` reading
-`YYYY-MM-DDTHH:MM:SSZ`, and each timestamp is strictly after the one before it.
-So `.[-1]` is the newest scan by proof rather than by convention.
+Nothing in this repo enforces the ordering rule above. A record appended out of
+run order, or one carrying a malformed or missing `timestamp`, is caught by no
+test here, so `.[-1]` is the newest scan by convention rather than by proof.
 
 The record schema belongs to
 [`rainlanguage/adversarial-mutation-test`](https://github.com/rainlanguage/adversarial-mutation-test).

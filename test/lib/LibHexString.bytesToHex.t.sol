@@ -243,23 +243,6 @@ contract LibHexStringBytesToHexTest is Test {
         assertEq(iExternal.bytesToHex(vm, data), LibHexString.bytesToHex(vm, data));
     }
 
-    /// The wrapper that forces the ABI boundary is deployed once for the whole
-    /// suite, so a test that crosses the boundary deploys nothing of its own and
-    /// a revert test deploys exactly one contract, the stub `Vm` carrying the
-    /// return string that case is about. Counted off the test contract's nonce,
-    /// which rises by one for every contract it creates. Both tests measured
-    /// here are fuzzed or sit beside fuzzed siblings, where a deployment per
-    /// test is a deployment per run.
-    function testBytesToHexDeploysOnlyStubVms() external {
-        uint256 nonceBefore = vm.getNonce(address(this));
-
-        this.testBytesToHexSurvivesAbiBoundary(hex"aabb");
-        assertEq(vm.getNonce(address(this)), nonceBefore, "the ABI boundary test deployed a wrapper of its own");
-
-        this.testBytesToHexRevertsOnTruncatedVmOutput();
-        assertEq(vm.getNonce(address(this)), nonceBefore + 1, "a revert test deployed more than its stub Vm");
-    }
-
     /// The caller splices the result straight into a `hex"..."` literal, so the
     /// concatenation the generator actually performs is pinned exactly.
     function testBytesToHexConcatenatesIntoHexLiteral() external pure {

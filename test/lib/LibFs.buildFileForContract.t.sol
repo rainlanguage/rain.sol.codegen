@@ -4,8 +4,10 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibFs} from "src/lib/LibFs.sol";
-import {LibCodeGen} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
+import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @title LibFsBuildFileForContractTest
 /// @notice `buildFileForContract` is the only thing in this repo that touches
@@ -20,6 +22,14 @@ import {CodeGennable} from "test/concrete/CodeGennable.sol";
 /// consumers have the literal committed in their repos, so the literal is the
 /// oracle.
 contract LibFsBuildFileForContractTest is Test {
+    /// `vm.expectRevert` needs a call frame, and `buildFileForContract` is an
+    /// internal library function that is inlined into its caller.
+    LibFsExternal internal immutable iExternal;
+
+    constructor() {
+        iExternal = new LibFsExternal();
+    }
+
     /// Every test writes under `src/generated/`, which is a committed directory
     /// in this repo. Each test owns a distinct name so parallel suites cannot
     /// collide, none of them is `CodeGennable` (the committed artifact), and
@@ -233,5 +243,72 @@ contract LibFsBuildFileForContractTest is Test {
         assertEq(fromInstance, expectedFile(instance, ""));
         assertEq(fromOther, expectedFile(other, ""));
         cleanup(name);
+    }
+
+    /// Removes whatever is at `path`, so that a test asserting nothing was
+    /// written there establishes its own precondition rather than assuming one.
+    function cleanupPath(string memory path) internal {
+        if (vm.exists(path)) {
+            if (vm.isDir(path)) {
+                vm.removeDir(path, true);
+            } else {
+                vm.removeFile(path);
+            }
+        }
+    }
+
+    /// A name that is not a Solidity identifier gets no path from
+    /// `pathForContract`, and `buildFileForContract` asks for the path before it
+    /// reaches a cheatcode, so the refusal arrives before anything is written.
+    /// That the path is refused at all is asserted in `LibFsTest`; what is
+    /// asserted here is that the write inherits it, and that nothing lands on
+    /// disk when it does.
+    function assertNameRejected(string memory contractName) internal {
+        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, contractName));
+        iExternal.buildFileForContract(vm, address(this), contractName, "");
+    }
+
+    /// The path for an empty name is `src/generated/.sol`: valid generated
+    /// Solidity at a path that no compiler picks up as a contract file and that
+    /// `ls` hides, written by a build that reports success. Refused, and no
+    /// file appears there.
+    function testBuildFileForContractRejectsEmptyName() external {
+        cleanupPath("src/generated/.sol");
+        assertFalse(vm.exists("src/generated/.sol"), "dirty precondition");
+        assertNameRejected("");
+        assertFalse(vm.exists("src/generated/.sol"), "an empty name still wrote a file");
+    }
+
+    /// A separator in the name puts the file in a subdirectory of the generated
+    /// directory, which the `read-write` grant on that directory admits, so the
+    /// refusal has to come from the library.
+    function testBuildFileForContractRejectsSubdirectoryName() external {
+        cleanupPath("src/generated/sub");
+        assertFalse(vm.exists("src/generated/sub"), "dirty precondition");
+        assertNameRejected("sub/LibFsBuildSub");
+        assertFalse(vm.exists("src/generated/sub"), "a separator still created a subdirectory");
+    }
+
+    /// A relative directory reference leaves the generated directory. Under this
+    /// repo's `fs_permissions` the write is refused anyway, but under the
+    /// `read-write` grant on `.` that consumers commonly write it is not, so the
+    /// refusal has to come from here.
+    function testBuildFileForContractRejectsTraversalName() external {
+        assertNameRejected("..");
+        assertNameRejected("../../ESCAPED");
+    }
+
+    /// The `.sol` extension is appended by the library, so a name that carries
+    /// one would produce `Foo.sol.sol`.
+    function testBuildFileForContractRejectsExtensionInName() external {
+        assertNameRejected("LibFsBuildExtension.sol");
+    }
+
+    /// Every name that is not a Solidity identifier is refused, not just the
+    /// ones named above.
+    function testBuildFileForContractRejectsEveryNonIdentifierName(bytes memory nameBytes) external {
+        string memory contractName = string(nameBytes);
+        vm.assume(!LibCodeGenSlow.isContractNameSlow(contractName));
+        assertNameRejected(contractName);
     }
 }

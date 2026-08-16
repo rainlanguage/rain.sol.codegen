@@ -4,6 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibCodeGen, InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {LibCodeGenSlow, SLOW_HEAD_ALPHABET, SLOW_TAIL_ALPHABET} from "test/lib/LibCodeGenSlow.sol";
 
 /// @title LibCodeGenRequireContractNameTest
 /// @notice `requireContractName` is what stands between a caller supplied
@@ -166,5 +167,70 @@ contract LibCodeGenRequireContractNameTest is Test {
                 assertNotEq(uint8(nameBytes[i]), uint8(bytes1(hex"00")), "nul accepted");
             }
         } catch {}
+    }
+
+    /// Exhaustive over the leading byte: all 256 of them, accepted exactly when
+    /// the byte is in the head alphabet. Nothing about the boundaries of the
+    /// accepted ranges is left to a chosen example, and the oracle is the
+    /// alphabet written out character by character rather than the same range
+    /// arithmetic the library uses.
+    function testRequireContractNameEveryLeadingByte() external {
+        for (uint256 i = 0; i < 256; i++) {
+            string memory name = string(bytes.concat(bytes1(uint8(i))));
+            if (LibCodeGenSlow.containsSlow(SLOW_HEAD_ALPHABET, bytes1(uint8(i)))) {
+                assertAccepted(name);
+            } else {
+                assertRejected(name);
+            }
+        }
+    }
+
+    /// Exhaustive over the trailing byte, behind a leading byte that is itself
+    /// accepted. The digits separate this from the leading case: they are
+    /// accepted here and rejected there.
+    function testRequireContractNameEveryTrailingByte() external {
+        for (uint256 i = 0; i < 256; i++) {
+            string memory name = string(bytes.concat(bytes("A"), bytes1(uint8(i))));
+            if (LibCodeGenSlow.containsSlow(SLOW_TAIL_ALPHABET, bytes1(uint8(i)))) {
+                assertAccepted(name);
+            } else {
+                assertRejected(name);
+            }
+        }
+    }
+
+    /// Over arbitrary names of arbitrary length, acceptance agrees with the
+    /// reference alphabet exactly. The reference is spelled out character by
+    /// character, so this fails if either end of any range moves, rather than
+    /// following the library the way an inlined copy of its own arithmetic
+    /// would.
+    function testRequireContractNameMatchesAlphabet(bytes memory nameBytes) external {
+        string memory name = string(nameBytes);
+        if (LibCodeGenSlow.isContractNameSlow(name)) {
+            assertAccepted(name);
+        } else {
+            assertRejected(name);
+        }
+    }
+
+    /// Names built to be identifiers are accepted at any length and across the
+    /// whole alphabet. Fuzzing a name directly essentially never produces an
+    /// identifier, so without constructing them the accepted half of the domain
+    /// is never exercised at all and a check that rejected everything would
+    /// still pass.
+    function testRequireContractNameAcceptsGeneratedIdentifiers(bytes memory seed) external view {
+        string memory name = LibCodeGenSlow.nameFromSeedSlow(seed);
+        assertTrue(bytes(name).length > 0, "generated an empty name");
+        assertAccepted(name);
+    }
+
+    /// A single byte outside the alphabet is enough to reject a name that is
+    /// otherwise an identifier, wherever in the name it sits. A check that only
+    /// looked at the first or the last character would pass this.
+    function testRequireContractNameRejectsOneBadByte(bytes memory seed, uint256 position, uint8 badByte) external {
+        bytes memory nameBytes = bytes(LibCodeGenSlow.nameFromSeedSlow(seed));
+        vm.assume(!LibCodeGenSlow.containsSlow(SLOW_TAIL_ALPHABET, bytes1(badByte)));
+        nameBytes[position % nameBytes.length] = bytes1(badByte);
+        assertRejected(string(nameBytes));
     }
 }

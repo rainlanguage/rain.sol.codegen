@@ -23,9 +23,10 @@ bytes4 constant I_PARSER_TOOLING_V1_INTERFACE_ID = 0x1a2c8edd;
 contract IParserToolingV1Test is Test {
     /// The id is held against a literal rather than against a recomputation of
     /// itself, so a change to the interface's function set moves the id off the
-    /// literal instead of carrying the literal along with it. This is the only
-    /// one of the four ids that is an exclusive or of two selectors rather than
-    /// a single selector, so it also moves when the two builders swap names.
+    /// literal instead of carrying the literal along with it. This is the one id
+    /// of the four that is an exclusive or of two selectors rather than a single
+    /// selector, so it moves when either builder's name or arguments change and
+    /// stays put when the two builders exchange names with each other.
     function testIParserToolingV1InterfaceId() external pure {
         assertEq(bytes32(type(IParserToolingV1).interfaceId), bytes32(I_PARSER_TOOLING_V1_INTERFACE_ID));
     }

@@ -314,6 +314,24 @@ contract LibFsBuildFileForContractTest is Test {
         cleanup(name);
     }
 
+    /// The revert data from a write, or empty bytes when the write was
+    /// accepted. `vm.expectRevert` would end the test at the call that is
+    /// supposed to revert and does not, and a write that reaches disk is not
+    /// undone by the revert that follows it, so the file would be left in
+    /// `src/generated/` for the next compile to pick up. Catching the revert
+    /// keeps the assertion for after the file is removed.
+    function headerRejection(
+        string memory contractName,
+        string memory spdxLicenseIdentifier,
+        string memory copyrightText
+    ) internal returns (bytes memory) {
+        try iExternal.buildFileForContract(vm, address(this), contractName, spdxLicenseIdentifier, copyrightText, "") {
+            return "";
+        } catch (bytes memory reason) {
+            return reason;
+        }
+    }
+
     /// The write inherits the rule `filePrefix` puts on the licence and the
     /// copyright, so a build script that names neither cannot produce a file
     /// that claims to be licensed and is not.
@@ -321,15 +339,22 @@ contract LibFsBuildFileForContractTest is Test {
         string memory name = "LibFsBuildInvalidHeader";
         cleanup(name);
 
-        vm.expectRevert(abi.encodeWithSelector(InvalidSpdxLicenseIdentifier.selector, ""));
-        iExternal.buildFileForContract(vm, address(this), name, "", COPYRIGHT_TEXT, "");
+        bytes memory emptyLicence = headerRejection(name, "", COPYRIGHT_TEXT);
+        bytes memory brokenCopyright = headerRejection(name, SPDX_LICENSE_IDENTIFIER, "Copyright (c) 2026 Someone\n");
+        bool written = vm.exists(LibFs.pathForContract(name));
+        cleanup(name);
 
-        vm.expectRevert(abi.encodeWithSelector(InvalidCopyrightText.selector, "Copyright (c) 2026 Someone\n"));
-        iExternal.buildFileForContract(
-            vm, address(this), name, SPDX_LICENSE_IDENTIFIER, "Copyright (c) 2026 Someone\n", ""
+        assertEq(
+            emptyLicence,
+            abi.encodeWithSelector(InvalidSpdxLicenseIdentifier.selector, ""),
+            "an empty licence was not refused"
         );
-
-        assertFalse(vm.exists(LibFs.pathForContract(name)), "a refused header still wrote a file");
+        assertEq(
+            brokenCopyright,
+            abi.encodeWithSelector(InvalidCopyrightText.selector, "Copyright (c) 2026 Someone\n"),
+            "a copyright carrying a line break was not refused"
+        );
+        assertFalse(written, "a refused header still wrote a file");
     }
 
     /// Removes whatever is at `path`, so that a test asserting nothing was

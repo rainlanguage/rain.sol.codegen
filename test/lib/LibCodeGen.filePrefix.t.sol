@@ -120,7 +120,9 @@ contract LibCodeGenFilePrefixTest is Test {
 
     /// An empty licence identifier emits the licence tag with nothing after it.
     /// A REUSE lint that tests for the tag's presence passes that file, so the
-    /// file would report as licensed while naming no licence.
+    /// file would report as licensed while naming no licence, and solc refuses
+    /// it with "Invalid SPDX license identifier" so the repo it is generated
+    /// into stops compiling.
     function testFilePrefixRejectsEmptyLicence() external {
         vm.expectRevert(abi.encodeWithSelector(InvalidSpdxLicenseIdentifier.selector, ""));
         this.callFilePrefix("", "Copyright (c) 2020 Rain Open Source Software Ltd");

@@ -28,7 +28,8 @@ error CodelessInstance(address instance);
 
 /// Thrown when an SPDX licence identifier is not a non-empty single line. An
 /// empty identifier names no licence on a tag that a presence check accepts, and
-/// a line break ends the tag's line so that everything after it lands as source.
+/// solc refuses the file it heads with "Invalid SPDX license identifier". A line
+/// break ends the tag's line so that everything after it lands as source.
 /// @param spdxLicenseIdentifier The rejected identifier.
 error InvalidSpdxLicenseIdentifier(string spdxLicenseIdentifier);
 

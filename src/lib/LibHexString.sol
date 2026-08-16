@@ -12,8 +12,9 @@ import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 error UnexpectedHexString(string hexString, uint256 expectedLength);
 
 /// @title LibHexString
-/// @notice A library for converting bytes to hexadecimal strings. Uses the
-/// standard foundry Vm to perform the conversion.
+/// @notice A library for converting bytes to hexadecimal strings. The `Vm` that
+/// performs the conversion is a parameter, so what it returns is checked rather
+/// than assumed.
 library LibHexString {
     /// Converts a bytes array to its hexadecimal string representation but
     /// without the leading "0x". This is useful because solidity does not always

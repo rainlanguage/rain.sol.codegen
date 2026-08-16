@@ -20,6 +20,19 @@ pointers, which pointers feed back into the generation. This cycle means
 pointers may need to be regenerated several times until they reach a fixed point
 where neither pointer values nor the codehash of any consuming contract shift.
 
+## Formatter requirements
+
+`LibCodeGen` wraps the declarations it emits itself, deciding against
+`MAX_LINE_LENGTH` and `NEWLINE_DUE_TO_MAX_LENGTH`. Those two encode
+`forge fmt`'s `line_length` and `tab_width`, which this repo states in `[fmt]`
+of `foundry.toml` rather than inheriting.
+
+A consuming repo whose `[fmt]` disagrees gets generated sources its own
+`forge fmt` reflows. `rainix-copy-artifacts` regenerates, runs `forge fmt`, then
+`git diff --exit-code`, so that reflow is committed as the new baseline instead
+of being reported. Consumers therefore need `line_length = 120` and
+`tab_width = 4`.
+
 ## Install
 
 Via [soldeer](https://soldeer.xyz):

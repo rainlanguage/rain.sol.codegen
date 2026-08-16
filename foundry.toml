@@ -27,8 +27,14 @@ cbor_metadata = false
 
 evm_version = "cancun"
 
+# `src`, `test` and `script` are readable so the suite can assert conventions
+# over the repo's own source. The longest matching path wins, so `src/generated`
+# stays writable.
 fs_permissions = [
   { access = "read", path = "foundry.toml" },
+  { access = "read", path = "src" },
+  { access = "read", path = "test" },
+  { access = "read", path = "script" },
   { access = "read-write", path = "src/generated" },
   { access = "read-write", path = "meta" },
 ]

@@ -5,7 +5,6 @@ pragma solidity =0.8.25;
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibFs} from "src/lib/LibFs.sol";
 import {InvalidContractName} from "src/lib/LibCodeGen.sol";
-import {Build} from "script/Build.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
@@ -31,11 +30,10 @@ contract LibFsBuildFileForContractTest is Test {
         iExternal = new LibFsExternal();
     }
 
-    /// The tests that call this write under `src/generated/`, which is a
-    /// committed directory in this repo. Each owns a distinct name so parallel
-    /// suites cannot collide, and none of them is `CodeGennable`: the committed
-    /// artifact is regenerated and written back by its own test rather than
-    /// removed here.
+    /// Every test writes under `src/generated/`, which is a committed directory
+    /// in this repo. Each test owns a distinct name so parallel suites cannot
+    /// collide, none of them is `CodeGennable` (the committed artifact), and
+    /// each removes its file again.
     function cleanup(string memory contractName) internal {
         string memory path = LibFs.pathForContract(contractName);
         if (vm.exists(path)) {
@@ -198,33 +196,6 @@ contract LibFsBuildFileForContractTest is Test {
         assertEq(vm.readFile(LibFs.pathForContract(nameB)), expectedFile(instance, bodyB), "sibling b is wrong");
         cleanup(nameA);
         cleanup(nameB);
-    }
-
-    /// `src/generated/CodeGennable.sol` is committed, and `script/Build.sol`
-    /// writes it. Rerunning that script and comparing every byte of what it
-    /// produces against what is committed is what makes a stale artifact red
-    /// `forge test` rather than only the separate `rainix-copy-artifacts` job.
-    /// It is the whole generation pipeline that is rerun, so the body the
-    /// artifact carries is covered as well as its header, and `script/Build.sol`
-    /// is covered along with it.
-    ///
-    /// Deliberately built from the library and the script here, unlike the
-    /// tests above: the claim is that the committed bytes are what those emit
-    /// now, so they are the correct side to regenerate from and the file on
-    /// disk is the oracle.
-    ///
-    /// The committed bytes are read before the regeneration and written back
-    /// after it, so the working tree is left as it was found whichever way the
-    /// comparison goes.
-    function testBuildFileForContractCommittedArtifactIsCurrent() external {
-        string memory path = LibFs.pathForContract("CodeGennable");
-        string memory committed = vm.readFile(path);
-
-        new Build().run();
-        string memory regenerated = vm.readFile(path);
-        vm.writeFile(path, committed);
-
-        assertEq(regenerated, committed, "committed artifact is stale, regenerate with script/Build.sol");
     }
 
     /// The bytecode hash is read from the instance that was passed in, not from

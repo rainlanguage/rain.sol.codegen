@@ -29,6 +29,7 @@ evm_version = "cancun"
 
 fs_permissions = [
   { access = "read", path = "foundry.toml" },
+  { access = "read", path = "audit/mutation-test-scans.json" },
   { access = "read-write", path = "src/generated" },
   { access = "read-write", path = "meta" },
 ]

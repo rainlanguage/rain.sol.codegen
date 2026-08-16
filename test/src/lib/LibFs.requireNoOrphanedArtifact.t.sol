@@ -76,9 +76,14 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
     }
 
     /// Asserts `outcome` is the check refusing `orphan`, by the exact error and
-    /// path a consumer is shown.
+    /// path a consumer is shown. The comparison is over the raw revert bytes,
+    /// so the message says in words what those bytes are meant to be.
     function assertRefused(bytes memory outcome, string memory orphan) internal pure {
-        assertEq(outcome, abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan), "wrong refusal");
+        assertEq(
+            outcome,
+            abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan),
+            string.concat("not refused as OrphanedGeneratedArtifact(", orphan, ")")
+        );
     }
 
     /// No artifact at all for the contract is the first generation in a repo,

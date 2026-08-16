@@ -343,7 +343,11 @@ contract LibFsBuildFileForContractTest is Test {
         cleanupPath(orphan);
         cleanupPath(LibFs.pathForContract(name));
 
-        assertEq(outcome, abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan), "wrong refusal");
+        assertEq(
+            outcome,
+            abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan),
+            string.concat("not refused as OrphanedGeneratedArtifact(", orphan, ")")
+        );
         assertFalse(wroteSecondArtifact, "a second artifact was written for the contract");
         assertEq(orphanContent, existing, "the artifact that was already there was touched");
     }

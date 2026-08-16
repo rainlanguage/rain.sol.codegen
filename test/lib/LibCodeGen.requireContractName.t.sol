@@ -132,8 +132,9 @@ contract LibCodeGenRequireContractNameTest is Test {
     /// library decides with. The name is generated as a `string` rather than as
     /// `bytes`, which is all that separates this from
     /// `testRequireContractNameMatchesAlphabet`: uniform bytes are an identifier
-    /// only by accident, and almost only at length one, so it is the `string`
-    /// generator that carries the accepted half of the domain here.
+    /// only by accident, and the `string` generator lands on one several times
+    /// more often, so it is this test that carries the accepted half of the
+    /// domain.
     function testRequireContractNameAcceptedNamesAreIdentifiers(string memory name) external {
         if (LibCodeGenSlow.isContractNameSlow(name)) {
             assertAccepted(name);

@@ -4,7 +4,6 @@ pragma solidity ^0.8.25;
 
 import {Vm} from "forge-std-1.16.1/src/Vm.sol";
 import {LibCodeGen} from "./LibCodeGen.sol";
-import {LibContractName} from "./LibContractName.sol";
 
 /// @dev The directory that generated contract files are written to, relative to
 /// the project root. Consumers commit this directory and import from it by
@@ -32,7 +31,7 @@ library LibFs {
     /// @param contractName The name of the contract, interpolated verbatim.
     /// @return The file path as a string.
     function pathForContract(string memory contractName) internal pure returns (string memory) {
-        LibContractName.requireValidContractName(contractName);
+        LibCodeGen.requireContractName(contractName);
         return string.concat(GENERATED_DIR, "/", contractName, ".sol");
     }
 

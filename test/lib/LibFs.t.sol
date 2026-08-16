@@ -4,9 +4,9 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
-import {InvalidContractName} from "src/lib/LibContractName.sol";
+import {InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
-import {LibContractNameSlow} from "test/lib/LibContractNameSlow.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @title LibFsTest
 /// @notice `pathForContract` is the only thing that puts a caller supplied name
@@ -55,7 +55,7 @@ contract LibFsTest is Test {
     /// length equality is what makes it exhaustive: it forbids any extra byte
     /// anywhere.
     function testPathForContractStructure(bytes memory seed) external pure {
-        string memory contractName = LibContractNameSlow.nameFromSeedSlow(seed);
+        string memory contractName = LibCodeGenSlow.nameFromSeedSlow(seed);
         bytes memory path = bytes(LibFs.pathForContract(contractName));
         bytes memory name = bytes(contractName);
 
@@ -71,8 +71,8 @@ contract LibFsTest is Test {
     /// the domain the function accepts rather than from strings it refuses to
     /// produce a path for at all.
     function testPathForContractDistinctNamesDistinctPaths(bytes memory seedA, bytes memory seedB) external pure {
-        string memory a = LibContractNameSlow.nameFromSeedSlow(seedA);
-        string memory b = LibContractNameSlow.nameFromSeedSlow(seedB);
+        string memory a = LibCodeGenSlow.nameFromSeedSlow(seedA);
+        string memory b = LibCodeGenSlow.nameFromSeedSlow(seedB);
         vm.assume(keccak256(bytes(a)) != keccak256(bytes(b)));
         assertNotEq(LibFs.pathForContract(a), LibFs.pathForContract(b));
     }
@@ -81,7 +81,7 @@ contract LibFsTest is Test {
     /// outside the consumer's repo entirely, so the first byte is never a
     /// separator.
     function testPathForContractIsRelative(bytes memory seed) external pure {
-        bytes memory path = bytes(LibFs.pathForContract(LibContractNameSlow.nameFromSeedSlow(seed)));
+        bytes memory path = bytes(LibFs.pathForContract(LibCodeGenSlow.nameFromSeedSlow(seed)));
         assertTrue(path.length > 0, "empty path");
         assertNotEq(uint8(path[0]), uint8(bytes1("/")), "path is absolute");
     }
@@ -92,7 +92,7 @@ contract LibFsTest is Test {
     /// generated identifiers, so no accepted name can reach a subdirectory, a
     /// parent directory, or a hidden file.
     function testPathForContractAcceptedNamesStayInGeneratedDir(bytes memory seed) external pure {
-        string memory contractName = LibContractNameSlow.nameFromSeedSlow(seed);
+        string memory contractName = LibCodeGenSlow.nameFromSeedSlow(seed);
         bytes memory path = bytes(LibFs.pathForContract(contractName));
         bytes memory dir = bytes(GENERATED_DIR);
 
@@ -151,7 +151,7 @@ contract LibFsTest is Test {
     /// string is essentially never an identifier.
     function testPathForContractRejectsEveryNonIdentifierName(bytes memory nameBytes) external {
         string memory contractName = string(nameBytes);
-        vm.assume(!LibContractNameSlow.isValidContractNameSlow(contractName));
+        vm.assume(!LibCodeGenSlow.isContractNameSlow(contractName));
         assertNameRejected(contractName);
     }
 }

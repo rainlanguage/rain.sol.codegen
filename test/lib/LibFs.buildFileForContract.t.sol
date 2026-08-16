@@ -4,11 +4,10 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibFs} from "src/lib/LibFs.sol";
-import {LibCodeGen} from "src/lib/LibCodeGen.sol";
-import {InvalidContractName} from "src/lib/LibContractName.sol";
+import {LibCodeGen, InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
-import {LibContractNameSlow} from "test/lib/LibContractNameSlow.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @title LibFsBuildFileForContractTest
 /// @notice `buildFileForContract` is the only thing in this repo that touches
@@ -309,7 +308,7 @@ contract LibFsBuildFileForContractTest is Test {
     /// ones named above.
     function testBuildFileForContractRejectsEveryNonIdentifierName(bytes memory nameBytes) external {
         string memory contractName = string(nameBytes);
-        vm.assume(!LibContractNameSlow.isValidContractNameSlow(contractName));
+        vm.assume(!LibCodeGenSlow.isContractNameSlow(contractName));
         assertNameRejected(contractName);
     }
 }

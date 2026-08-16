@@ -246,6 +246,18 @@ contract LibFsBuildFileForContractTest is Test {
         cleanup(name);
     }
 
+    /// Removes whatever is at `path`, so that a test asserting nothing was
+    /// written there establishes its own precondition rather than assuming one.
+    function cleanupPath(string memory path) internal {
+        if (vm.exists(path)) {
+            if (vm.isDir(path)) {
+                vm.removeDir(path, true);
+            } else {
+                vm.removeFile(path);
+            }
+        }
+    }
+
     /// The name goes into the path, so a name that is not a Solidity identifier
     /// is refused before anything is written.
     function assertNameRejected(string memory contractName) internal {
@@ -258,6 +270,7 @@ contract LibFsBuildFileForContractTest is Test {
     /// `ls` hides, written by a build that reports success. Refused, and no
     /// file appears there.
     function testBuildFileForContractRejectsEmptyName() external {
+        cleanupPath("src/generated/.sol");
         assertFalse(vm.exists("src/generated/.sol"), "dirty precondition");
         assertNameRejected("");
         assertFalse(vm.exists("src/generated/.sol"), "an empty name still wrote a file");
@@ -267,6 +280,7 @@ contract LibFsBuildFileForContractTest is Test {
     /// directory, which the `read-write` grant on that directory admits, so the
     /// refusal has to come from the library.
     function testBuildFileForContractRejectsSubdirectoryName() external {
+        cleanupPath("src/generated/sub");
         assertFalse(vm.exists("src/generated/sub"), "dirty precondition");
         assertNameRejected("sub/LibFsBuildSub");
         assertFalse(vm.exists("src/generated/sub"), "a separator still created a subdirectory");

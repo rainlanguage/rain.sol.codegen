@@ -52,6 +52,35 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
         return string.concat(GENERATED_DIR, "/", contractName, ".", suffix);
     }
 
+    /// Runs the check and hands back what it reverted with, or empty bytes when
+    /// it did not revert. Nothing here asserts, so a caller removes its
+    /// fixtures before it asserts anything about them.
+    ///
+    /// A revert and a failed assertion both abort the test body at the point
+    /// they happen, so a fixture removed after either one is removed only on
+    /// the runs that pass. Every fixture these tests write is a file this check
+    /// refuses on, and they all share the one generated directory, so a fixture
+    /// left behind by a failing run is a precondition the next run does not get
+    /// to choose.
+    function checkOutcome(string memory contractName) internal returns (bytes memory) {
+        try iExternal.requireNoOrphanedArtifact(vm, contractName) {
+            return "";
+        } catch (bytes memory reason) {
+            return reason;
+        }
+    }
+
+    /// Asserts `outcome` is the check accepting the contract.
+    function assertAccepted(bytes memory outcome) internal pure {
+        assertEq(outcome.length, 0, "the check refused a contract it must accept");
+    }
+
+    /// Asserts `outcome` is the check refusing `orphan`, by the exact error and
+    /// path a consumer is shown.
+    function assertRefused(bytes memory outcome, string memory orphan) internal pure {
+        assertEq(outcome, abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan), "wrong refusal");
+    }
+
     /// No artifact at all for the contract is the first generation in a repo,
     /// which must not be refused.
     function testRequireNoOrphanedArtifactAcceptsNothingForTheContract() external {
@@ -68,9 +97,10 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
         string memory name = "LibFsOrphanCurrent";
         vm.writeFile(LibFs.pathForContract(name), PLACEHOLDER_SOURCE);
 
-        LibFs.requireNoOrphanedArtifact(vm, name);
+        bytes memory outcome = checkOutcome(name);
 
         cleanupPath(LibFs.pathForContract(name));
+        assertAccepted(outcome);
     }
 
     /// The artifact name this library wrote before `src/generated/<Name>.sol`.
@@ -82,10 +112,10 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
         cleanupPath(legacy);
         vm.writeFile(legacy, PLACEHOLDER_SOURCE);
 
-        vm.expectRevert(abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, legacy));
-        iExternal.requireNoOrphanedArtifact(vm, name);
+        bytes memory outcome = checkOutcome(name);
 
         cleanupPath(legacy);
+        assertRefused(outcome, legacy);
     }
 
     /// Having generated the current file does not excuse the orphan: adding the
@@ -98,11 +128,11 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
         vm.writeFile(LibFs.pathForContract(name), PLACEHOLDER_SOURCE);
         vm.writeFile(legacy, PLACEHOLDER_SOURCE);
 
-        vm.expectRevert(abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, legacy));
-        iExternal.requireNoOrphanedArtifact(vm, name);
+        bytes memory outcome = checkOutcome(name);
 
         cleanupPath(legacy);
         cleanupPath(LibFs.pathForContract(name));
+        assertRefused(outcome, legacy);
     }
 
     /// Writes an artifact for `contractName` carrying `suffix`, asserts it is
@@ -113,10 +143,10 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
         cleanupPath(orphan);
         vm.writeFile(orphan, PLACEHOLDER_SOURCE);
 
-        vm.expectRevert(abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan));
-        iExternal.requireNoOrphanedArtifact(vm, contractName);
+        bytes memory outcome = checkOutcome(contractName);
 
         cleanupPath(orphan);
+        assertRefused(outcome, orphan);
     }
 
     /// The refusal is keyed on the contract name, not on the one extension that
@@ -149,9 +179,10 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
         cleanupPath(bare);
         vm.writeFile(bare, PLACEHOLDER_SOURCE);
 
-        LibFs.requireNoOrphanedArtifact(vm, name);
+        bytes memory outcome = checkOutcome(name);
 
         cleanupPath(bare);
+        assertAccepted(outcome);
     }
 
     /// An artifact belongs to the contract whose name it carries in full, up to
@@ -167,10 +198,11 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
         vm.writeFile(sibling, PLACEHOLDER_SOURCE);
         vm.writeFile(unrelated, PLACEHOLDER_SOURCE);
 
-        LibFs.requireNoOrphanedArtifact(vm, name);
+        bytes memory outcome = checkOutcome(name);
 
         cleanupPath(sibling);
         cleanupPath(unrelated);
+        assertAccepted(outcome);
     }
 
     /// A name that is a prefix of this one, and so a shorter contract's
@@ -181,9 +213,10 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
         cleanupPath(shorter);
         vm.writeFile(shorter, PLACEHOLDER_SOURCE);
 
-        LibFs.requireNoOrphanedArtifact(vm, name);
+        bytes memory outcome = checkOutcome(name);
 
         cleanupPath(shorter);
+        assertAccepted(outcome);
     }
 
     /// Consumers freeze per release snapshots into subdirectories of the
@@ -198,9 +231,10 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
         vm.writeFile(string.concat(dir, "/", name, ".pointers.sol"), PLACEHOLDER_SOURCE);
         vm.writeFile(string.concat(dir, "/", name, ".sol"), PLACEHOLDER_SOURCE);
 
-        LibFs.requireNoOrphanedArtifact(vm, name);
+        bytes memory outcome = checkOutcome(name);
 
         cleanupPath(dir);
+        assertAccepted(outcome);
     }
 
     /// A directory occupying an artifact's name is not something this library
@@ -212,10 +246,10 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
         cleanupPath(orphan);
         vm.createDir(orphan, true);
 
-        vm.expectRevert(abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan));
-        iExternal.requireNoOrphanedArtifact(vm, name);
+        bytes memory outcome = checkOutcome(name);
 
         cleanupPath(orphan);
+        assertRefused(outcome, orphan);
     }
 
     /// The check asks `pathForContract` which file is the current one, so it

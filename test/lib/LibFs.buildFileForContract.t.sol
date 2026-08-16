@@ -327,12 +327,25 @@ contract LibFsBuildFileForContractTest is Test {
         vm.writeFile(orphan, existing);
         address instance = address(new CodeGennable());
 
-        vm.expectRevert(abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan));
-        iExternal.buildFileForContract(vm, instance, name, "\n// body\n");
+        // Caught rather than expected, and everything read off disk before any
+        // assertion, so the orphan is removed on the runs that fail too. It is
+        // a file this refusal fires on, and every test here shares the one
+        // generated directory, so one left behind is a precondition the next
+        // run does not get to choose.
+        bytes memory outcome;
+        try iExternal.buildFileForContract(vm, instance, name, "\n// body\n") {}
+        catch (bytes memory reason) {
+            outcome = reason;
+        }
+        bool wroteSecondArtifact = vm.exists(LibFs.pathForContract(name));
+        string memory orphanContent = vm.readFile(orphan);
 
-        assertFalse(vm.exists(LibFs.pathForContract(name)), "a second artifact was written for the contract");
-        assertEq(vm.readFile(orphan), existing, "the artifact that was already there was touched");
         cleanupPath(orphan);
+        cleanupPath(LibFs.pathForContract(name));
+
+        assertEq(outcome, abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan), "wrong refusal");
+        assertFalse(wroteSecondArtifact, "a second artifact was written for the contract");
+        assertEq(orphanContent, existing, "the artifact that was already there was touched");
     }
 
     /// The refusal happens before the directory is read for the file's own

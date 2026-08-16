@@ -20,6 +20,16 @@ pointers, which pointers feed back into the generation. This cycle means
 pointers may need to be regenerated several times until they reach a fixed point
 where neither pointer values nor the codehash of any consuming contract shift.
 
+That loop belongs to the reusable, not to a person running regeneration until
+they guess it has settled. It repeats the whole regeneration until the working
+tree stops changing, up to `max-codegen-passes` (5 by default), and a repo still
+moving when the bound is spent fails with `did not reach a fixed point`. That is
+a different failure from `Committed artifacts are stale`, and takes a different
+fix: the cycle itself does not settle, so regenerating again never produces a
+tree worth committing. Committing whichever pass happens to diff clean is what
+the bound exists to stop — it records a `BYTECODE_HASH` for a contract compiled
+against a different pass of the same file.
+
 ## Install
 
 Via [soldeer](https://soldeer.xyz):
@@ -51,6 +61,12 @@ Regenerate the committed example artifact under `src/generated/`:
 ```sh
 forge script script/Build.sol
 ```
+
+One run settles it here: `CodeGennable` imports nothing from `src/generated/`,
+so its codehash does not move when the file recording it is rewritten. A
+consumer whose contracts import what they generate has no such guarantee, and
+locally has only `git status` to tell it that a run changed nothing — repeat
+until it does.
 
 On top of the above, CI applies rainix's org-wide static checks via
 [`.github/workflows/rainix.yaml`](.github/workflows/rainix.yaml).

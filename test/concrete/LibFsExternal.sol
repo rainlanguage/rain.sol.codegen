@@ -16,4 +16,8 @@ contract LibFsExternal {
     function pathForContract(string memory contractName) external pure returns (string memory) {
         return LibFs.pathForContract(contractName);
     }
+
+    function requireNoOrphanedArtifact(Vm vm, string memory contractName) external view {
+        LibFs.requireNoOrphanedArtifact(vm, contractName);
+    }
 }

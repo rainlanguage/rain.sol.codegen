@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibFs} from "src/lib/LibFs.sol";
+import {LibFs, OrphanedGeneratedArtifact} from "src/lib/LibFs.sol";
 import {LibCodeGen, InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
@@ -310,5 +310,44 @@ contract LibFsBuildFileForContractTest is Test {
         string memory contractName = string(nameBytes);
         vm.assume(!LibCodeGenSlow.isContractNameSlow(contractName));
         assertNameRejected(contractName);
+    }
+
+    /// A consumer holds the artifact this library used to write committed and
+    /// imported from `src/**`. Generating beside it would leave those imports
+    /// resolving to a file nothing regenerates, with the build reporting
+    /// success, so the generation is refused instead and nothing is written.
+    function testBuildFileForContractRefusesToOrphanAnotherArtifact() external {
+        string memory name = "LibFsBuildOrphan";
+        string memory orphan = string.concat("src/generated/", name, ".pointers.sol");
+        //REUSE-IgnoreStart
+        string memory existing = "// SPDX-License-Identifier: LicenseRef-DCL-1.0\npragma solidity ^0.8.25;\n";
+        //REUSE-IgnoreEnd
+        cleanupPath(orphan);
+        cleanupPath(LibFs.pathForContract(name));
+        vm.writeFile(orphan, existing);
+        address instance = address(new CodeGennable());
+
+        vm.expectRevert(abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan));
+        iExternal.buildFileForContract(vm, instance, name, "\n// body\n");
+
+        assertFalse(vm.exists(LibFs.pathForContract(name)), "a second artifact was written for the contract");
+        assertEq(vm.readFile(orphan), existing, "the artifact that was already there was touched");
+        cleanupPath(orphan);
+    }
+
+    /// The refusal happens before the directory is read for the file's own
+    /// path, so a consumer whose generated directory does not exist yet is not
+    /// refused for that reason.
+    function testBuildFileForContractGeneratesWhenNoOtherArtifactExists() external {
+        string memory name = "LibFsBuildNoOrphan";
+        cleanupPath(LibFs.pathForContract(name));
+        cleanupPath(string.concat("src/generated/", name, ".pointers.sol"));
+        address instance = address(new CodeGennable());
+        string memory body = "\n// no orphan\n";
+
+        LibFs.buildFileForContract(vm, instance, name, body);
+
+        assertEq(vm.readFile(LibFs.pathForContract(name)), expectedFile(instance, body));
+        cleanupPath(LibFs.pathForContract(name));
     }
 }

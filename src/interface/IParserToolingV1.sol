@@ -15,9 +15,12 @@ interface IParserToolingV1 {
     /// configuration, the output can be tested against the used value in CI and
     /// the translation from source to pointers can also be tested in CI. See
     /// .github/workflows/build-pointers.yaml for an example of such a test.
+    /// Declared `view` so an implementation may read storage or an immutable to
+    /// build its answer. A `pure` implementation still conforms, as an override
+    /// may only tighten mutability.
     /// @return Every two bytes is a function pointer for an operand handler,
     /// positionally indexed to match the parse meta.
-    function buildOperandHandlerFunctionPointers() external pure returns (bytes memory);
+    function buildOperandHandlerFunctionPointers() external view returns (bytes memory);
 
     /// Builds literal parser function pointers.
     /// This is intended for use by the Rain interpreter to run literal parsing
@@ -27,7 +30,10 @@ interface IParserToolingV1 {
     /// configuration, the output can be tested against the used value in CI and
     /// the translation from source to pointers can also be tested in CI. See
     /// .github/workflows/build-pointers.yaml for an example of such a test.
+    /// Declared `view` so an implementation may read storage or an immutable to
+    /// build its answer. A `pure` implementation still conforms, as an override
+    /// may only tighten mutability.
     /// @return Every two bytes is a function pointer for a literal parser,
     /// dispatched on the first byte(s) of the literal.
-    function buildLiteralParserFunctionPointers() external pure returns (bytes memory);
+    function buildLiteralParserFunctionPointers() external view returns (bytes memory);
 }

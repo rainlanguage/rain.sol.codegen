@@ -151,8 +151,7 @@ contract LibCodeGenReadmeTest is Test {
     /// not declarations and so are not collected twice.
     ///
     /// Scans twice, counting on the first pass and filling on the second, so the
-    /// array is sized to what is there rather than to a bound that no input in
-    /// this repo reaches.
+    /// returned array is exactly as long as the declarations `source` holds.
     /// @param source The Solidity source to scan.
     /// @return The emitter names in declaration order.
     function emitterNames(bytes memory source) internal pure returns (string[] memory) {

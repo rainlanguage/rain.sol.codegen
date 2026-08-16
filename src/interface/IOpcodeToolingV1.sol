@@ -15,5 +15,7 @@ interface IOpcodeToolingV1 {
     /// compiler configuration, the output can be tested against the used value
     /// in CI and the translation from source to pointers can also be tested in
     /// CI. See .github/workflows/build-pointers.yaml for an example of such a test.
+    /// @return Every two bytes is a function pointer for an opcode
+    /// implementation, positionally indexed by opcode.
     function buildOpcodeFunctionPointers() external view returns (bytes memory);
 }

@@ -14,5 +14,7 @@ interface ISubParserToolingV1 {
     /// compiler configuration, the output can be tested against the used value
     /// in CI and the translation from source to parsers can also be tested in
     /// CI. See .github/workflows/build-pointers.yaml for an example of such a test.
+    /// @return Every two bytes is a function pointer for a sub parser word
+    /// parser, positionally indexed to match the parse meta.
     function buildSubParserWordParsers() external pure returns (bytes memory);
 }

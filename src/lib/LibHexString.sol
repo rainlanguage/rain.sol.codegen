@@ -31,19 +31,35 @@ library LibHexString {
     /// @return The hexadecimal string representation of the bytes array.
     function bytesToHex(Vm vm, bytes memory data) internal pure returns (string memory) {
         string memory hexString = vm.toString(data);
-
         uint256 expectedLength = data.length * 2 + 2;
-        bytes memory hexBytes = bytes(hexString);
-        if (hexBytes.length != expectedLength || hexBytes[0] != bytes1("0") || hexBytes[1] != bytes1("x")) {
-            revert UnexpectedHexString(hexString, expectedLength);
+
+        bool stripped;
+        assembly ("memory-safe") {
+            let len := mload(hexString)
+            // The length is checked first and the prefix is only read inside
+            // it, because `and` in Yul evaluates both arms. `expectedLength` is
+            // at least 2, so a length that matches it guarantees the word read
+            // below is within the string's own allocation.
+            if eq(len, expectedLength) {
+                // The first two bytes of the data word against "0x". One word
+                // load rather than two indexed byte reads, and it reuses the
+                // pointer the strip already needs.
+                if eq(shr(240, mload(add(hexString, 0x20))), 0x3078) {
+                    // Remove the leading 0x, which solidity does not always
+                    // accept — such as in `hex"..."` literals.
+                    let newHexString := add(hexString, 2)
+                    mstore(newHexString, sub(len, 2))
+                    hexString := newHexString
+                    stripped := 1
+                }
+            }
         }
 
-        assembly ("memory-safe") {
-            // Remove the leading 0x which is unconditionally added by
-            // vm.toString.
-            let newHexString := add(hexString, 2)
-            mstore(newHexString, sub(mload(hexString), 2))
-            hexString := newHexString
+        // The revert stays in solidity: the error carries a dynamic string, and
+        // hand-encoding one in assembly is a dozen lines of pointer arithmetic
+        // for a build-time function where gas is not a consideration.
+        if (!stripped) {
+            revert UnexpectedHexString(hexString, expectedLength);
         }
         return hexString;
     }

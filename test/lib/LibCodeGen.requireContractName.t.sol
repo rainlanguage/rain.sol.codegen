@@ -53,6 +53,31 @@ contract LibCodeGenRequireContractNameTest is Test {
         assertAccepted("F0o_$9");
     }
 
+    /// Each of the three character ranges is closed at exactly its ends. Pinned
+    /// from both sides: the first and last character of every range is
+    /// accepted, and the character immediately outside each end is refused.
+    /// A range that runs one past either of its ends admits one of the six
+    /// characters sitting against them: at sign, `[`, backtick, `{`, `/` or
+    /// `:` — none of which belongs in an identifier, and one of which is a
+    /// path separator. Nothing else in this suite distinguishes those six from
+    /// the ranges they sit against, because a name has to be an identifier
+    /// apart from the one character under test for the boundary to be what
+    /// decides it.
+    function testRequireContractNameRangeBoundaries() external {
+        assertAccepted("A");
+        assertAccepted("Z");
+        assertAccepted("a");
+        assertAccepted("z");
+        assertAccepted("A0");
+        assertAccepted("A9");
+        assertRejected("@");
+        assertRejected("[");
+        assertRejected("`");
+        assertRejected("{");
+        assertRejected("A/");
+        assertRejected("A:");
+    }
+
     /// An empty name would build `src/generated/.sol` and `meta/.rain.meta`:
     /// hidden dotfiles that no compiler picks up and `ls` does not show, written
     /// with a success report.

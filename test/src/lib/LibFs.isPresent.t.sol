@@ -144,6 +144,7 @@ contract LibFsIsPresentTest is Test {
         remove(controlFileName);
 
         symlink(linkName, targetName);
+        assertEq(LibFs.pathForContract(name), pathFor(linkName), "the link is not where the write goes");
         assertEq(readlink(linkName).exitCode, 0, "the path under test is not a symlink");
         assertFalse(vm.exists(pathFor(targetName)), "the link target is already there");
         assertFalse(vm.exists(pathFor(linkName)), "the link is not dangling");

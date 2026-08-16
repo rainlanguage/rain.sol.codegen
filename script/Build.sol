@@ -10,7 +10,9 @@ import {CodeGennable} from "../test/concrete/CodeGennable.sol";
 /// @title Build
 /// @notice Script to build the generated file for the CodeGennable contract.
 /// @dev This shows an example of how to use the bytes constant generation
-/// utility in LibCodeGen.
+/// utility in LibCodeGen. The licence and copyright passed to
+/// `buildFileForContract` are this repo's own, which is what every consumer
+/// states for itself.
 contract Build is Script {
     /// Builds the generated file for the CodeGennable contract to show an example
     /// of how to use the bytes constant generation utility.
@@ -21,6 +23,8 @@ contract Build is Script {
             vm,
             address(codeGennable),
             "CodeGennable",
+            "LicenseRef-DCL-1.0",
+            "Copyright (c) 2020 Rain Open Source Software Ltd",
             string.concat(
                 LibCodeGen.bytesConstantString(
                     vm, "/// @dev Some bytes comment.", "SOME_BYTES_CONSTANT", hex"12345678"

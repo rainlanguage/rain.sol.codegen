@@ -26,10 +26,6 @@ string constant FIRST_HEADING = "\n## ";
 /// well as in the phrase map below.
 uint256 constant EXPECTED_EMITTER_COUNT = 11;
 
-/// @dev Upper bound on emitters the scanner will collect before it gives up.
-/// Only bounds the scratch array; exceeding it fails the test.
-uint256 constant MAX_EMITTERS = 64;
-
 /// @title LibCodeGenReadmeTest
 /// @notice The README's opening tells a reader what this library produces, and
 /// the set of things it produces is `LibCodeGen`'s emitting functions. This
@@ -153,41 +149,48 @@ contract LibCodeGenReadmeTest is Test {
     /// is `function `, an identifier, then `(`, and an emitter is a declaration
     /// whose name ends with `EMITTER_SUFFIX`. Calls to those same functions are
     /// not declarations and so are not collected twice.
+    ///
+    /// Scans twice, counting on the first pass and filling on the second, so the
+    /// array is sized to what is there rather than to a bound that no input in
+    /// this repo reaches.
     /// @param source The Solidity source to scan.
     /// @return The emitter names in declaration order.
     function emitterNames(bytes memory source) internal pure returns (string[] memory) {
         bytes memory keyword = bytes("function ");
         bytes memory suffix = bytes(EMITTER_SUFFIX);
-        string[] memory found = new string[](MAX_EMITTERS);
-        uint256 count = 0;
-        uint256 cursor = 0;
+        string[] memory names = new string[](0);
 
-        while (true) {
-            (bool isFound, uint256 at) = indexOf(source, keyword, cursor);
-            if (!isFound) {
-                break;
-            }
-            cursor = at + keyword.length;
+        for (uint256 pass = 0; pass < 2; pass++) {
+            uint256 count = 0;
+            uint256 cursor = 0;
 
-            uint256 end = cursor;
-            while (end < source.length && isIdentifierChar(source[end])) {
-                end++;
-            }
-            if (end == cursor || end >= source.length || source[end] != "(") {
-                continue;
+            while (true) {
+                (bool isFound, uint256 at) = indexOf(source, keyword, cursor);
+                if (!isFound) {
+                    break;
+                }
+                cursor = at + keyword.length;
+
+                uint256 end = cursor;
+                while (end < source.length && isIdentifierChar(source[end])) {
+                    end++;
+                }
+                if (end == cursor || end >= source.length || source[end] != "(") {
+                    continue;
+                }
+
+                bytes memory name = slice(source, cursor, end);
+                if (endsWith(name, suffix)) {
+                    if (pass == 1) {
+                        names[count] = string(name);
+                    }
+                    count++;
+                }
             }
 
-            bytes memory name = slice(source, cursor, end);
-            if (endsWith(name, suffix)) {
-                assertLt(count, MAX_EMITTERS, "more emitters than the scanner can hold");
-                found[count] = string(name);
-                count++;
+            if (pass == 0) {
+                names = new string[](count);
             }
-        }
-
-        string[] memory names = new string[](count);
-        for (uint256 i = 0; i < count; i++) {
-            names[i] = found[i];
         }
         return names;
     }

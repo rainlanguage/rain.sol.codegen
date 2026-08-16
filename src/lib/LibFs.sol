@@ -35,6 +35,27 @@ library LibFs {
         return string.concat(GENERATED_DIR, "/", contractName, ".sol");
     }
 
+    /// @notice True if anything occupies `path`, including a symlink whose
+    /// target does not exist.
+    /// @dev `vm.exists` answers for whatever the path resolves to, so it reports
+    /// a symlink with no target as absent. `vm.readLink` answers for the path
+    /// itself and reverts unless the path is a symlink, so it sees the link that
+    /// `vm.exists` does not.
+    /// @param vm The Vm instance for file operations.
+    /// @param path The path to check, which must be readable under
+    /// `fs_permissions`.
+    /// @return True if the path holds a file, a directory or a symlink.
+    function isPresent(Vm vm, string memory path) internal view returns (bool) {
+        if (vm.exists(path)) {
+            return true;
+        }
+        try vm.readLink(path) returns (string memory) {
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
     /// @notice Builds a file for a generated contract at
     /// `pathForContract(contractName)`.
     ///
@@ -48,7 +69,8 @@ library LibFs {
     ///
     /// Anything already at the path is unlinked before the write, so a symlink
     /// there is replaced by a regular file rather than written through to its
-    /// target, and the path does not exist between the unlink and the write.
+    /// target, including a symlink whose target does not exist, and the path
+    /// does not exist between the unlink and the write.
     /// Any manual changes to the generated file, or any other existing file at
     /// that path, are lost.
     ///
@@ -65,7 +87,7 @@ library LibFs {
         string memory path = pathForContract(contractName);
         //forge-lint: disable-next-line(unsafe-cheatcode)
         vm.createDir(GENERATED_DIR, true);
-        if (vm.exists(path)) {
+        if (isPresent(vm, path)) {
             //forge-lint: disable-next-line(unsafe-cheatcode)
             vm.removeFile(path);
         }

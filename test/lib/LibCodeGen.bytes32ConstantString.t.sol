@@ -3,7 +3,13 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibCodeGen} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
+import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
+
+/// @dev A `bytes32` literal is 66 characters whatever the value, so the
+/// declaration is `96 + name.length` characters long on one line.
+bytes32 constant SOME_HASH = 0x2573004ac3a9ee7fc8d73654d76386f1b6b99e34cdf86a689c4691e47143420f;
+string constant SOME_HASH_STRING = "0x2573004ac3a9ee7fc8d73654d76386f1b6b99e34cdf86a689c4691e47143420f";
 
 /// @title LibCodeGenBytes32ConstantStringTest
 /// @notice `bytes32ConstantString` emits a Solidity `bytes32 constant`
@@ -42,5 +48,42 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
             string.concat("\n/// @dev Fuzz.\nbytes32 constant FUZZ = bytes32(", vm.toString(data), ");\n")
         );
         assertEq(vm.parseBytes32(vm.toString(data)), data);
+    }
+
+    /// A declaration of exactly the maximum length stays on one line. `forge fmt`
+    /// leaves a line of exactly `line_length` alone, so wrapping here would be a
+    /// reflow the formatter immediately undoes.
+    function testBytes32ConstantStringAtMaxLength() external view {
+        string memory name = LibCodeGenSlow.nameOfLengthSlow(24);
+        string memory emitted = LibCodeGen.bytes32ConstantString(vm, "/// @dev At max.", name, SOME_HASH);
+        assertEq(
+            emitted,
+            string.concat("\n/// @dev At max.\nbytes32 constant ", name, " = bytes32(", SOME_HASH_STRING, ");\n")
+        );
+        assertEq(LibCodeGenSlow.longestLineSlow(emitted), MAX_LINE_LENGTH);
+    }
+
+    /// One character past the maximum wraps after the `=`, with the value
+    /// indented by one tab width on the next line.
+    function testBytes32ConstantStringOverMaxLength() external view {
+        string memory name = LibCodeGenSlow.nameOfLengthSlow(25);
+        assertEq(
+            LibCodeGen.bytes32ConstantString(vm, "/// @dev Over max.", name, SOME_HASH),
+            string.concat("\n/// @dev Over max.\nbytes32 constant ", name, " =\n    bytes32(", SOME_HASH_STRING, ");\n")
+        );
+    }
+
+    /// Whatever the comment, name and value, the emitted text is the declaration
+    /// built from those literals, wrapped exactly when measuring the one line
+    /// form says it does not fit. Fuzzed over every input because each term of
+    /// the library's hand computed sum has to be right for this to hold.
+    function testBytes32ConstantStringMatchesMeasuredLine(string memory comment, string memory name, bytes32 data)
+        external
+        view
+    {
+        assertEq(
+            LibCodeGen.bytes32ConstantString(vm, comment, name, data),
+            LibCodeGenSlow.bytes32ConstantStringSlow(vm, comment, name, data)
+        );
     }
 }

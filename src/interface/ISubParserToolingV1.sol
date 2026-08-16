@@ -16,5 +16,8 @@ interface ISubParserToolingV1 {
     /// CI. `script/Build.sol` in this package is a worked example of such a
     /// generation, and the test is to run it in CI and fail on any diff against
     /// the committed source.
-    function buildSubParserWordParsers() external pure returns (bytes memory);
+    /// Declared `view` so an implementation may read storage or an immutable to
+    /// build its answer. A `pure` implementation still conforms, as an override
+    /// may only tighten mutability.
+    function buildSubParserWordParsers() external view returns (bytes memory);
 }

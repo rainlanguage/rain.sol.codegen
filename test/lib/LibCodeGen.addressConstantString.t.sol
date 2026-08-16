@@ -3,7 +3,13 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibCodeGen} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
+import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
+
+/// @dev A checksummed address literal, 42 characters like every other, so the
+/// declaration is `72 + name.length` characters long on one line.
+address constant SOME_ADDRESS = address(0xc51a14251b0dcF0ae24A96b7153991378938f5F5);
+string constant SOME_ADDRESS_STRING = "0xc51a14251b0dcF0ae24A96b7153991378938f5F5";
 
 /// @title LibCodeGenAddressConstantStringTest
 /// @notice `addressConstantString` emits a Solidity `address constant`
@@ -35,5 +41,44 @@ contract LibCodeGenAddressConstantStringTest is Test {
             emitted, string.concat("\n/// @dev Fuzz.\naddress constant FUZZ = address(", vm.toString(data), ");\n")
         );
         assertEq(vm.parseAddress(vm.toString(data)), data);
+    }
+
+    /// A declaration of exactly the maximum length stays on one line. `forge fmt`
+    /// leaves a line of exactly `line_length` alone, so wrapping here would be a
+    /// reflow the formatter immediately undoes.
+    function testAddressConstantStringAtMaxLength() external view {
+        string memory name = LibCodeGenSlow.nameOfLengthSlow(48);
+        string memory emitted = LibCodeGen.addressConstantString(vm, "/// @dev At max.", name, SOME_ADDRESS);
+        assertEq(
+            emitted,
+            string.concat("\n/// @dev At max.\naddress constant ", name, " = address(", SOME_ADDRESS_STRING, ");\n")
+        );
+        assertEq(LibCodeGenSlow.longestLineSlow(emitted), MAX_LINE_LENGTH);
+    }
+
+    /// One character past the maximum wraps after the `=`, with the value
+    /// indented by one tab width on the next line.
+    function testAddressConstantStringOverMaxLength() external view {
+        string memory name = LibCodeGenSlow.nameOfLengthSlow(49);
+        assertEq(
+            LibCodeGen.addressConstantString(vm, "/// @dev Over max.", name, SOME_ADDRESS),
+            string.concat(
+                "\n/// @dev Over max.\naddress constant ", name, " =\n    address(", SOME_ADDRESS_STRING, ");\n"
+            )
+        );
+    }
+
+    /// Whatever the comment, name and address, the emitted text is the
+    /// declaration built from those literals, wrapped exactly when measuring the
+    /// one line form says it does not fit. Fuzzed over every input because each
+    /// term of the library's hand computed sum has to be right for this to hold.
+    function testAddressConstantStringMatchesMeasuredLine(string memory comment, string memory name, address data)
+        external
+        view
+    {
+        assertEq(
+            LibCodeGen.addressConstantString(vm, comment, name, data),
+            LibCodeGenSlow.addressConstantStringSlow(vm, comment, name, data)
+        );
     }
 }

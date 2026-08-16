@@ -47,11 +47,11 @@ library LibFs {
     /// in a repo does not need it committed already.
     ///
     /// The whole file content is built before anything on disk is touched, and
-    /// building it reverts for an `instance` that holds no code. Cheatcode
-    /// filesystem effects survive the revert that ends the run, so ordering the
-    /// build first is what keeps a failed generation from leaving the directory
-    /// worse than it found it: nothing is created, unlinked or written unless
-    /// there is content to write.
+    /// building it reverts for an `instance` that holds no code. A revert does
+    /// not roll back cheatcode filesystem effects, so ordering the build first
+    /// is what keeps a failed generation from leaving the directory worse than
+    /// it found it: nothing is created, unlinked or written unless there is
+    /// content to write.
     ///
     /// Anything already at the path is unlinked before the write, so a symlink
     /// there is replaced by a regular file rather than written through to its

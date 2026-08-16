@@ -29,6 +29,8 @@ evm_version = "cancun"
 
 fs_permissions = [
   { access = "read", path = "foundry.toml" },
+  { access = "read", path = "README.md" },
+  { access = "read", path = "src/lib/LibCodeGen.sol" },
   { access = "read-write", path = "src/generated" },
   { access = "read-write", path = "meta" },
 ]

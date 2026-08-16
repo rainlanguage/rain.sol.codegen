@@ -1,9 +1,11 @@
 # rain.sol.codegen
 
 Solidity-native tooling to generate Solidity source. Builds a valid `.sol` file
-(pragma + foundry-clean formatting) that hosts the constant caches for prebuilt
-function-pointer tables — needed for runtime gas efficiency in the Rain
-interpreter.
+(pragma + foundry-clean formatting) hosting build-time constants that a contract
+imports and the compiler inlines: prebuilt function-pointer tables (the case
+that motivates it — runtime gas efficiency in the Rain interpreter), a
+deployed-bytecode hash, a described-by meta hash, and plain
+`address`/`uint8`/`bytes32`/`bytes` constants.
 
 Also exposes the tooling interfaces (`IIntegrityToolingV1`, `IOpcodeToolingV1`,
 `IParserToolingV1`, `ISubParserToolingV1`) that Rain contracts implement to

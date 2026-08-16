@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
+import {LibFs} from "src/lib/LibFs.sol";
 import {LibCodeGen} from "src/lib/LibCodeGen.sol";
 import {InvalidContractName} from "src/lib/LibContractName.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
@@ -258,8 +258,12 @@ contract LibFsBuildFileForContractTest is Test {
         }
     }
 
-    /// The name goes into the path, so a name that is not a Solidity identifier
-    /// is refused before anything is written.
+    /// A name that is not a Solidity identifier gets no path from
+    /// `pathForContract`, and `buildFileForContract` asks for the path before it
+    /// reaches a cheatcode, so the refusal arrives before anything is written.
+    /// That the path is refused at all is asserted in `LibFsTest`; what is
+    /// asserted here is that the write inherits it, and that nothing lands on
+    /// disk when it does.
     function assertNameRejected(string memory contractName) internal {
         vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, contractName));
         iExternal.buildFileForContract(vm, address(this), contractName, "");
@@ -307,33 +311,5 @@ contract LibFsBuildFileForContractTest is Test {
         string memory contractName = string(nameBytes);
         vm.assume(!LibContractNameSlow.isValidContractNameSlow(contractName));
         assertNameRejected(contractName);
-    }
-
-    /// What the check buys: the path built for a name the library accepts is
-    /// one segment directly inside the generated directory, and the only dot in
-    /// it is the extension the library appends. Asserted by counting, over
-    /// generated identifiers, so no accepted name can reach a subdirectory, a
-    /// parent directory, or a hidden file.
-    function testBuildFileForContractAcceptedNamesStayInGeneratedDir(bytes memory seed) external pure {
-        string memory contractName = LibContractNameSlow.nameFromSeedSlow(seed);
-        bytes memory path = bytes(LibFs.pathForContract(contractName));
-        bytes memory dir = bytes(GENERATED_DIR);
-
-        uint256 separators = 0;
-        for (uint256 i = 0; i < path.length; i++) {
-            if (path[i] == "/") {
-                separators++;
-            }
-            if (path[i] == ".") {
-                assertEq(i, path.length - 4, "a dot outside the appended extension");
-            }
-        }
-        uint256 dirSeparators = 0;
-        for (uint256 i = 0; i < dir.length; i++) {
-            if (dir[i] == "/") {
-                dirSeparators++;
-            }
-        }
-        assertEq(separators, dirSeparators + 1, "the path is not a direct child of the generated directory");
     }
 }

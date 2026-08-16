@@ -17,20 +17,32 @@ string constant GENERATED_DIR = "src/generated";
 /// the placement and idempotent creation of generated files.
 library LibFs {
     /// @notice Constructs the file path for a contract's generated file.
+    ///
+    /// Reverts unless `contractName` is a Solidity identifier, so every path
+    /// this function returns is a direct child of `GENERATED_DIR`. The check is
+    /// here rather than at the write because the path is what carries the name
+    /// out of this library: a caller that takes the returned path and does its
+    /// own IO with it gets the same confinement `buildFileForContract` does,
+    /// and there is no name for which this library produces a path at all
+    /// without producing a safe one.
+    ///
+    /// An accepted name is interpolated verbatim, so it reaches the path byte
+    /// for byte and is never quoted, escaped, trimmed, case folded or
+    /// truncated.
     /// @param contractName The name of the contract, interpolated verbatim.
-    /// The result is a path inside `GENERATED_DIR` only for a name that is a
-    /// Solidity identifier, which `buildFileForContract` requires before it
-    /// writes.
     /// @return The file path as a string.
     function pathForContract(string memory contractName) internal pure returns (string memory) {
+        LibContractName.requireValidContractName(contractName);
         return string.concat(GENERATED_DIR, "/", contractName, ".sol");
     }
 
     /// @notice Builds a file for a generated contract at
     /// `pathForContract(contractName)`.
     ///
-    /// `contractName` must be a Solidity identifier, so the file is always a
-    /// direct child of `GENERATED_DIR`.
+    /// `contractName` must be a Solidity identifier, which `pathForContract`
+    /// requires of every path it returns, so the file is always a direct child
+    /// of `GENERATED_DIR` and a rejected name reverts before any cheatcode is
+    /// reached.
     ///
     /// `GENERATED_DIR` is created if it does not exist, so the first generation
     /// in a repo does not need it committed already.
@@ -51,7 +63,6 @@ library LibFs {
     /// @param contractName The name of the contract.
     /// @param body The body of the contract file to be written.
     function buildFileForContract(Vm vm, address instance, string memory contractName, string memory body) internal {
-        LibContractName.requireValidContractName(contractName);
         string memory path = pathForContract(contractName);
         //forge-lint: disable-next-line(unsafe-cheatcode)
         vm.createDir(GENERATED_DIR, true);

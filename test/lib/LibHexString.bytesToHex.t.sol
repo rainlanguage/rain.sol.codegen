@@ -69,6 +69,15 @@ contract LibHexStringBytesToHexTest is Test {
         );
     }
 
+    /// The prefix is removed, not merely expected to be absent. `0x` cannot
+    /// appear in hex output, so any `x` in the result is a prefix that survived.
+    function testBytesToHexHasNoPrefix(bytes memory data) external pure {
+        bytes memory hexBytes = bytes(LibHexString.bytesToHex(vm, data));
+        for (uint256 i = 0; i < hexBytes.length; i++) {
+            assertTrue(hexBytes[i] != bytes1("x"), "prefix survived");
+        }
+    }
+
     /// Two characters per byte, exactly. An off by one here emits an odd number
     /// of hex nibbles and the generated source does not compile.
     function testBytesToHexLength(bytes memory data) external pure {
@@ -77,10 +86,6 @@ contract LibHexStringBytesToHexTest is Test {
 
     /// Every character is a lower case hex nibble. Anything else in the string
     /// terminates or corrupts the `hex"..."` literal it is spliced into.
-    ///
-    /// `x` is outside that alphabet, and hex output can only hold an `x` as a
-    /// prefix character the strip left behind, so this also pins that the
-    /// prefix is removed rather than merely expected to be absent.
     function testBytesToHexCharset(bytes memory data) external pure {
         bytes memory hexBytes = bytes(LibHexString.bytesToHex(vm, data));
         for (uint256 i = 0; i < hexBytes.length; i++) {

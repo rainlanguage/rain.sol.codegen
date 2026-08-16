@@ -239,7 +239,7 @@ contract LibHexStringBytesToHexTest is Test {
     /// The result survives ABI encoding as return data. The pointer handed back
     /// is deliberately not word aligned, so a consumer that copies it must still
     /// see the same characters.
-    function testBytesToHexSurvivesAbiBoundary(bytes memory data) external {
+    function testBytesToHexSurvivesAbiBoundary(bytes memory data) external view {
         assertEq(iExternal.bytesToHex(vm, data), LibHexString.bytesToHex(vm, data));
     }
 

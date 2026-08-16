@@ -195,6 +195,38 @@ contract LibHexStringBytesToHexTest is Test {
         );
     }
 
+    /// The input belongs to the caller. Converting it must not write through the
+    /// pointer it was handed.
+    function testBytesToHexDoesNotMutateInput(bytes memory data) external pure {
+        uint256 lengthBefore = data.length;
+        bytes32 contentBefore = keccak256(data);
+
+        LibHexString.bytesToHex(vm, data);
+
+        assertEq(data.length, lengthBefore, "input length was mutated");
+        assertEq(keccak256(data), contentBefore, "input content was mutated");
+    }
+
+    /// The payload ends flush with the end of the buffer `vm.toString` allocated
+    /// whenever `data.length % 16 == 15`, because the two stripped characters are
+    /// exactly the slack in the word rounding. Concatenating forces a copy of the
+    /// whole string, which is where a copier reading past the buffer would show
+    /// up.
+    function testBytesToHexAllocationBoundary() external pure {
+        assertEq(
+            string.concat("<", LibHexString.bytesToHex(vm, hex"000102030405060708090a0b0c0d0e"), ">"),
+            "<000102030405060708090a0b0c0d0e>"
+        );
+        assertEq(
+            string.concat(
+                "<",
+                LibHexString.bytesToHex(vm, hex"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e"),
+                ">"
+            ),
+            "<000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e>"
+        );
+    }
+
     /// The result survives ABI encoding as return data. The pointer handed back
     /// is deliberately not word aligned, so a consumer that copies it must still
     /// see the same characters.

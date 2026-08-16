@@ -134,12 +134,14 @@ contract LibFsBuildFileForTaggedContractTest is Test {
 
     /// An existing file at the path is replaced, not appended to and not
     /// partially overwritten. The pre-existing content is deliberately longer
-    /// than what is generated, so any tail of it left behind fails here.
+    /// than what is generated, so any tail of it left behind fails here. It is
+    /// also a formatted Solidity comment, because it lands at a `.sol` path
+    /// under `src/` that both the compiler and `forge fmt` read on the next run.
     function testBuildFileForTaggedContractReplacesExistingContent() external {
         string memory tag = "0_1_1$taggedOverwrite";
         cleanup(tag);
         vm.createDir(LibFs.dirForTag(tag), true);
-        string memory stale = "STALE";
+        string memory stale = "// STALE\n";
         for (uint256 i = 0; i < 8; i++) {
             stale = string.concat(stale, stale);
         }
@@ -263,17 +265,19 @@ contract LibFsBuildFileForTaggedContractTest is Test {
     }
 
     /// The tagged write never touches the untagged file for the same contract
-    /// name, so adding a snapshot cannot silently replace a current pin.
+    /// name, so adding a snapshot cannot silently replace a current pin. The
+    /// sentinel is a Solidity comment, because it lands at a `.sol` path under
+    /// `src/` that the compiler reads on the next run.
     function testBuildFileForTaggedContractLeavesTheUntaggedFileAlone() external {
         string memory tag = "0_1_1$taggedUntagged";
         cleanup(tag);
         address instance = address(new CodeGennable());
         string memory untaggedPath = LibFs.pathForContract("LibFsTaggedUntagged");
-        vm.writeFile(untaggedPath, "UNTAGGED");
+        vm.writeFile(untaggedPath, "// UNTAGGED\n");
 
         LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedUntagged", "\n// tagged\n");
 
-        assertEq(vm.readFile(untaggedPath), "UNTAGGED", "the untagged file was disturbed");
+        assertEq(vm.readFile(untaggedPath), "// UNTAGGED\n", "the untagged file was disturbed");
         vm.removeFile(untaggedPath);
         cleanup(tag);
     }

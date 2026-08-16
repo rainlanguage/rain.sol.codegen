@@ -32,9 +32,6 @@ evm_version = "cancun"
 ffi = true
 
 fs_permissions = [
-  # The published interfaces' documentation is asserted against the artifacts
-  # solc emits for them, which is the form a consumer receives it in.
-  { access = "read", path = "out" },
   { access = "read", path = "foundry.toml" },
   { access = "read-write", path = "src/generated" },
   { access = "read-write", path = "meta" },

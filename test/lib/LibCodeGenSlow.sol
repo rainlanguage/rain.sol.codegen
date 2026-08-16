@@ -177,6 +177,39 @@ library LibCodeGenSlow {
         return true;
     }
 
+    /// True if `tag` is drawn from the tag alphabet, decided by membership of
+    /// the written out alphabet rather than by arithmetic. The tag alphabet is
+    /// the identifier alphabet with no rule about the first character, which is
+    /// exactly `SLOW_TAIL_ALPHABET`: a tail character is any character an
+    /// identifier admits at all.
+    function isTagSlow(string memory tag) internal pure returns (bool) {
+        bytes memory tagBytes = bytes(tag);
+        if (tagBytes.length == 0) {
+            return false;
+        }
+        for (uint256 i = 0; i < tagBytes.length; i++) {
+            if (!containsSlow(SLOW_TAIL_ALPHABET, tagBytes[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Folds arbitrary bytes into a tag, so that the accepted half of the tag
+    /// domain can be fuzzed at all. Unlike `nameFromSeedSlow` the first
+    /// character is drawn from the same alphabet as the rest, because a tag has
+    /// no rule about its first character, so the digit opening tags such as
+    /// `0_1_1` is reachable here.
+    function tagFromSeedSlow(bytes memory seed) internal pure returns (string memory) {
+        bytes memory alphabet = bytes(SLOW_TAIL_ALPHABET);
+        uint256 length = seed.length == 0 ? 1 : seed.length;
+        bytes memory tag = new bytes(length);
+        for (uint256 i = 0; i < length; i++) {
+            tag[i] = alphabet[(seed.length == 0 ? 0 : uint256(uint8(seed[i]))) % alphabet.length];
+        }
+        return string(tag);
+    }
+
     /// Folds arbitrary bytes into a name that is a Solidity identifier, so that
     /// the accepted half of the domain can be fuzzed at all. Random bytes are
     /// essentially never an identifier, so fuzzing names directly only ever

@@ -16,4 +16,30 @@ contract LibFsExternal {
     function pathForContract(string memory contractName) external pure returns (string memory) {
         return LibFs.pathForContract(contractName);
     }
+
+    function buildFileForTaggedContract(
+        Vm vm,
+        address instance,
+        string memory tag,
+        string memory contractName,
+        string memory body
+    ) external {
+        LibFs.buildFileForTaggedContract(vm, instance, tag, contractName, body);
+    }
+
+    function pathForTaggedContract(string memory tag, string memory contractName)
+        external
+        pure
+        returns (string memory)
+    {
+        return LibFs.pathForTaggedContract(tag, contractName);
+    }
+
+    function dirForTag(string memory tag) external pure returns (string memory) {
+        return LibFs.dirForTag(tag);
+    }
+
+    function requireTag(string memory tag) external pure {
+        LibFs.requireTag(tag);
+    }
 }

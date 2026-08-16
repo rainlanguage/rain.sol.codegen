@@ -8,6 +8,14 @@ import {InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
+/// One entry of `foundry.toml`'s `fs_permissions` array. Decoded from the
+/// parsed TOML, so the field order is the alphabetical order of the keys rather
+/// than the order they are written in.
+struct FsPermission {
+    string access;
+    string path;
+}
+
 /// @title LibFsTest
 /// @notice `pathForContract` is the only thing that puts a caller supplied name
 /// into a path, so it owns the confinement: it reverts unless the name is a
@@ -19,6 +27,10 @@ import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 /// filtering for one would leave the property proven over nothing. Over the
 /// rejected domain, arbitrary bytes are exactly the right generator, because
 /// that is what the rejected domain is.
+///
+/// `GENERATED_DIR` is the root of every path the library builds, so this is also
+/// where the constant is held against the `fs_permissions` grant that has to
+/// admit the write.
 contract LibFsTest is Test {
     /// `vm.expectRevert` needs a call frame, and `pathForContract` is an
     /// internal library function that is inlined into its caller.
@@ -153,5 +165,38 @@ contract LibFsTest is Test {
         string memory contractName = string(nameBytes);
         vm.assume(!LibCodeGenSlow.isContractNameSlow(contractName));
         assertNameRejected(contractName);
+    }
+
+    /// `GENERATED_DIR` and `foundry.toml`'s `fs_permissions` are two spellings
+    /// of one fact: the directory the library writes into, and the directory
+    /// foundry admits a write to. Read out of the config here so they are
+    /// asserted to agree rather than each maintained by hand.
+    ///
+    /// A grant that stops covering the constant already reds the write tests,
+    /// but only as a cheatcode refusal that names neither the constant nor the
+    /// config. A grant that covers it as part of a BROADER path — `src`, or the
+    /// repo root — leaves every one of those tests green, because the write
+    /// still succeeds; the config has simply stopped naming the directory, and
+    /// the repo has silently taken write permission over everything under the
+    /// wider path. That case is what this catches, and it is why the grant is
+    /// required to be `GENERATED_DIR` exactly rather than merely to contain it.
+    ///
+    /// `read-write` and not `read`, because generation writes.
+    ///
+    /// Read at `profile.default` because that is the profile `forge test` and
+    /// `forge script` run under here, and the only one this repo declares.
+    function testGeneratedDirIsTheGrantedPath() external view {
+        string memory config = vm.readFile("foundry.toml");
+        FsPermission[] memory permissions =
+            abi.decode(vm.parseToml(config, ".profile.default.fs_permissions"), (FsPermission[]));
+
+        bool granted = false;
+        for (uint256 i = 0; i < permissions.length; i++) {
+            if (keccak256(bytes(permissions[i].path)) == keccak256(bytes(GENERATED_DIR))) {
+                assertEq(permissions[i].access, "read-write", "the fs_permissions grant on GENERATED_DIR is not write");
+                granted = true;
+            }
+        }
+        assertTrue(granted, "no fs_permissions entry in foundry.toml has GENERATED_DIR as its path");
     }
 }

@@ -17,6 +17,24 @@ import {CodeGennable} from "../concrete/CodeGennable.sol";
 contract LibCodeGenBytecodeHashConstantStringTest is Test {
     address internal constant INSTANCE = address(uint160(uint256(keccak256("instance"))));
 
+    /// `vm.etch` refuses code shaped like an EIP-7702 delegation designator —
+    /// leading bytes `0xef01` — unless it is exactly the 23 bytes such a
+    /// designator has to be. Measured against the cheatcode rather than assumed:
+    /// `0xef01` + 21 bytes is accepted, `0xef01` at 22, 24 and 2 bytes is
+    /// refused, and `0xef`, `0xef0000` and `0xef02…` are all accepted, so the
+    /// refusal is exactly this two byte prefix at a length other than 23.
+    ///
+    /// That is a restriction on what the cheatcode will install at an address,
+    /// not a property of `bytecodeHashConstantString`, so the fuzzer's domain
+    /// excludes it. Without this the suite passes or fails on the luck of the
+    /// fuzz seed: the seeds CI happened to draw never reached `0xef01…`, and
+    /// seeds drawn locally did, failing on the first run with
+    /// `vm.etch: failed to create bytecode: Eip7702 is not 23 bytes long`.
+    function assumeEtchableCode(bytes memory code) internal pure {
+        vm.assume(code.length > 0);
+        vm.assume(!(code.length >= 2 && code[0] == 0xef && code[1] == 0x01 && code.length != 23));
+    }
+
     /// The whole emitted declaration, for code put at the address by hand. The
     /// name and comment are the library's, not the caller's, so they are pinned
     /// exactly: every consumer's generated file and every consumer's assertion
@@ -58,7 +76,7 @@ contract LibCodeGenBytecodeHashConstantStringTest is Test {
 
     /// Whatever the runtime code, the constant carries its keccak256 hash.
     function testBytecodeHashConstantStringHashesCode(bytes memory code) external {
-        vm.assume(code.length > 0);
+        assumeEtchableCode(code);
         vm.etch(INSTANCE, code);
         assertEq(
             LibCodeGen.bytecodeHashConstantString(vm, INSTANCE),
@@ -74,7 +92,8 @@ contract LibCodeGenBytecodeHashConstantStringTest is Test {
     /// constant is a fingerprint of the code rather than of the address or of
     /// anything else about the account.
     function testBytecodeHashConstantStringDiscriminatesCode(bytes memory codeA, bytes memory codeB) external {
-        vm.assume(codeA.length > 0 && codeB.length > 0);
+        assumeEtchableCode(codeA);
+        assumeEtchableCode(codeB);
         vm.assume(keccak256(codeA) != keccak256(codeB));
 
         vm.etch(INSTANCE, codeA);
@@ -88,7 +107,7 @@ contract LibCodeGenBytecodeHashConstantStringTest is Test {
     /// The same instance generates the same text every time it is asked, so
     /// regenerating a file twice does not produce a diff.
     function testBytecodeHashConstantStringIdempotent(bytes memory code) external {
-        vm.assume(code.length > 0);
+        assumeEtchableCode(code);
         vm.etch(INSTANCE, code);
         assertEq(
             LibCodeGen.bytecodeHashConstantString(vm, INSTANCE), LibCodeGen.bytecodeHashConstantString(vm, INSTANCE)

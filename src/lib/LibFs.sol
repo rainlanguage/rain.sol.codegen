@@ -49,6 +49,8 @@ library LibFs {
         if (vm.exists(path)) {
             return true;
         }
+        // What the target is does not matter here, only that the path has one.
+        //slither-disable-next-line unused-return
         try vm.readLink(path) returns (string memory) {
             return true;
         } catch {

@@ -104,4 +104,25 @@ contract LibCodeGenBytesConstantStringTest is Test {
         assertTrue(vm.contains(emitted, string.concat("hex\"", LibCodeGenSlow.hexOfSlow(vm, data), "\";\n")));
         assertFalse(vm.contains(emitted, "hex\"0x"), "hex literal carries a 0x prefix");
     }
+
+    /// An empty comment emits no comment line rather than an empty one. Two
+    /// consecutive newlines are a blank line that `forge fmt` collapses, so a
+    /// generated file carrying one is not stable under the formatter and a
+    /// consumer's `forge fmt --check` reds when it regenerates.
+    function testBytesConstantStringEmptyComment() external pure {
+        assertEq(
+            LibCodeGen.bytesConstantString(vm, "", "NO_COMMENT", DATA_32),
+            string.concat("\nbytes constant NO_COMMENT = hex\"", HEX_32, "\";\n")
+        );
+    }
+
+    /// The comment is the only thing an empty comment removes: the declaration
+    /// that follows it is byte for byte the same either way, including the
+    /// blank line that separates it from whatever precedes it.
+    function testBytesConstantStringEmptyCommentKeepsDeclaration() external pure {
+        assertEq(
+            LibCodeGen.bytesConstantString(vm, "/// @dev Some data.", "NO_COMMENT", DATA_32),
+            string.concat("\n/// @dev Some data.", LibCodeGen.bytesConstantString(vm, "", "NO_COMMENT", DATA_32))
+        );
+    }
 }

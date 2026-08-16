@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, MAX_LINE_LENGTH, CodelessInstance} from "src/lib/LibCodeGen.sol";
 import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
 import {CodeGennable} from "../concrete/CodeGennable.sol";
 
@@ -66,12 +66,81 @@ contract LibCodeGenBytecodeHashConstantStringTest is Test {
     }
 
     /// The name is fixed and so is the length of a `bytes32` literal, so this
-    /// declaration can never need wrapping. Asserted rather than assumed,
-    /// because this function does its own concatenation instead of going through
-    /// `bytes32ConstantString` and so has no wrap decision at all.
+    /// declaration fits on one line.
     function testBytecodeHashConstantStringFitsMaxLength() external {
         vm.etch(INSTANCE, hex"6001");
         assertLe(LibCodeGenSlow.longestLineSlow(LibCodeGen.bytecodeHashConstantString(vm, INSTANCE)), MAX_LINE_LENGTH);
+    }
+
+    /// The declaration is the one `bytes32ConstantString` builds, so it carries
+    /// the same wrap decision as every other `bytes32` constant rather than an
+    /// unconditional space of its own. Measured against the naive reference,
+    /// which builds the one line form and measures it, so this holds only while
+    /// the emitted line is what that measurement says it should be.
+    function testBytecodeHashConstantStringMatchesMeasuredLine(bytes memory code) external {
+        assumeEtchableCode(code);
+        vm.etch(INSTANCE, code);
+        assertEq(
+            LibCodeGen.bytecodeHashConstantString(vm, INSTANCE),
+            LibCodeGenSlow.bytes32ConstantStringSlow(
+                vm, "/// @dev Hash of the known bytecode.", "BYTECODE_HASH", keccak256(code)
+            )
+        );
+    }
+
+    /// An address with no code is refused rather than described. `codehash` for
+    /// such an address is `bytes32(0)` when the account does not exist, so a
+    /// constant carrying it would be satisfied by every address that has never
+    /// been touched.
+    function testBytecodeHashConstantStringRejectsNonExistentAccount() external {
+        address empty = address(uint160(uint256(keccak256("never touched"))));
+        assertEq(empty.code.length, 0, "precondition: no code");
+        assertEq(empty.codehash, bytes32(0), "precondition: non existent account");
+
+        vm.expectRevert(abi.encodeWithSelector(CodelessInstance.selector, empty));
+        this.callBytecodeHash(empty);
+    }
+
+    /// An account that exists but holds no code is refused too. Its `codehash`
+    /// is `keccak256("")`, which looks like a real hash and is what every
+    /// funded EOA reports, so emitting it would produce a check that passes for
+    /// all of them.
+    function testBytecodeHashConstantStringRejectsFundedButCodeless() external {
+        address funded = address(uint160(uint256(keccak256("funded"))));
+        vm.deal(funded, 1 ether);
+        assertEq(funded.code.length, 0, "precondition: no code");
+        assertEq(funded.codehash, keccak256(""), "precondition: empty code hash");
+
+        vm.expectRevert(abi.encodeWithSelector(CodelessInstance.selector, funded));
+        this.callBytecodeHash(funded);
+    }
+
+    /// The zero address is not special cased into a pass. It is the address a
+    /// caller lands on when an instance variable was never assigned, which is
+    /// the mistake this refusal exists to catch.
+    function testBytecodeHashConstantStringRejectsZeroAddress() external {
+        vm.expectRevert(abi.encodeWithSelector(CodelessInstance.selector, address(0)));
+        this.callBytecodeHash(address(0));
+    }
+
+    /// Code of any length at all is enough: the refusal is on there being no
+    /// code, not on the code being too short to be a real contract.
+    function testBytecodeHashConstantStringAcceptsAnyNonEmptyCode() external {
+        vm.etch(INSTANCE, hex"00");
+        assertEq(
+            LibCodeGen.bytecodeHashConstantString(vm, INSTANCE),
+            string.concat(
+                "\n/// @dev Hash of the known bytecode.\nbytes32 constant BYTECODE_HASH = bytes32(",
+                vm.toString(keccak256(hex"00")),
+                ");\n"
+            )
+        );
+    }
+
+    /// Reachable only through an external call so that the refusal can be
+    /// caught rather than aborting the test.
+    function callBytecodeHash(address instance) external view returns (string memory) {
+        return LibCodeGen.bytecodeHashConstantString(vm, instance);
     }
 
     /// Whatever the runtime code, the constant carries its keccak256 hash.

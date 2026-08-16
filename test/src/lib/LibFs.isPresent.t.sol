@@ -165,4 +165,48 @@ contract LibFsIsPresentTest is Test {
         remove(targetName);
         remove(controlFileName);
     }
+
+    /// A symlink at the generated path whose target exists is replaced by a
+    /// regular file holding the generated content, and the target does not
+    /// receive it: the write goes to the path, not through it. The target is
+    /// removed along the way, which is what makes the path free to hold a
+    /// regular file.
+    ///
+    /// The content is compared against a second contract generated at a path
+    /// that held nothing, so the claim is that the two cases produce the same
+    /// file rather than that some particular bytes appear.
+    function testBuildFileForContractReplacesLiveSymlink() external {
+        string memory name = "LibFsIsPresentLive";
+        string memory linkName = "LibFsIsPresentLive.sol";
+        string memory targetName = "LibFsIsPresentLiveTarget.txt";
+        string memory controlName = "LibFsIsPresentLiveControl";
+        string memory controlFileName = "LibFsIsPresentLiveControl.sol";
+        remove(linkName);
+        remove(targetName);
+        remove(controlFileName);
+
+        vm.writeFile(pathFor(targetName), "SENTINEL");
+        symlink(linkName, targetName);
+        assertEq(LibFs.pathForContract(name), pathFor(linkName), "the link is not where the write goes");
+        assertEq(readlink(linkName).exitCode, 0, "the path under test is not a symlink");
+        assertTrue(vm.exists(pathFor(linkName)), "the link does not resolve");
+        assertEq(vm.readFile(pathFor(targetName)), "SENTINEL", "the link target is not the seeded file");
+
+        string memory body = "\n// live\n";
+        LibFs.buildFileForContract(vm, address(this), name, body);
+        LibFs.buildFileForContract(vm, address(this), controlName, body);
+
+        bool linkIsStillASymlink = readlink(linkName).exitCode == 0;
+        bool targetExists = vm.exists(pathFor(targetName));
+        string memory written = vm.readFile(pathFor(linkName));
+        string memory control = vm.readFile(pathFor(controlFileName));
+
+        remove(linkName);
+        remove(targetName);
+        remove(controlFileName);
+
+        assertFalse(linkIsStillASymlink, "the path is still a symlink");
+        assertFalse(targetExists, "the link target survived the write");
+        assertEq(written, control, "the file at the path is not what a write to a path holding nothing produces");
+    }
 }

@@ -291,7 +291,19 @@ contract LibHexStringBytesToHexTest is Test {
         external_.bytesToHex(badVm, hex"aabb");
     }
 
-    /// Both characters of the prefix are checked, not just the first.
+    /// Both characters of the prefix are checked, not just the second. The
+    /// second character here is a correct `x`, so only the check on the first
+    /// character rejects this.
+    function testBytesToHexRevertsOnWrongFirstPrefixCharacter() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("Zxaabb")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "Zxaabb", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// Both characters of the prefix are checked, not just the first. The first
+    /// character here is a correct `0`, so only the check on the second
+    /// character rejects this.
     function testBytesToHexRevertsOnWrongSecondPrefixCharacter() external {
         LibHexStringExternal external_ = new LibHexStringExternal();
         Vm badVm = Vm(address(new NonConformingVm("0Xaabb")));

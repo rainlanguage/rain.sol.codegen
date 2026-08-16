@@ -33,11 +33,12 @@ fs_permissions = [
   { access = "read-write", path = "meta" },
 ]
 
-# `buildFileForContract` unlinks whatever is at the path before it writes, so a
-# symlink there is replaced rather than written through to its target. forge-std
-# 1.16.1 can read a link (`readLink`) but cannot create one, so a test can only
-# set up that precondition by shelling out. This grant is repo wide: every test
-# and script here can run arbitrary commands.
+# `buildFileForContract` unlinks whatever is at the path before it writes, so
+# the write lands on a new file rather than through the one already there. A
+# hard link at the path is the only thing that observes the difference, and
+# forge-std 1.16.1 reads a link (`readLink`) but creates neither kind, so the
+# test that covers it shells out. This grant is repo wide: every test and
+# script here can run arbitrary commands.
 ffi = true
 
 [fuzz]

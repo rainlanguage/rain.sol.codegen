@@ -255,6 +255,11 @@ contract LibFsBuildFileForContractTest is Test {
     /// and rewrites the file already at the path, which is the same file the
     /// other name refers to.
     ///
+    /// `ln` needs a file to link to, so the placeholder is written first and
+    /// the sentinel is written through the other name once the link exists.
+    /// Reading the sentinel back through the path is what establishes that the
+    /// two names are one file rather than two files with equal bytes.
+    ///
     /// A symlink cannot witness this. `vm.removeFile` resolves the link and
     /// removes the target rather than the link, `vm.writeFile` follows the link
     /// and writes the target, and `vm.exists` resolves the link too, so with
@@ -269,7 +274,7 @@ contract LibFsBuildFileForContractTest is Test {
         string memory other = "src/generated/LibFsBuildUnlinkOther.txt";
         cleanupPath(path);
         cleanupPath(other);
-        vm.writeFile(other, "LINKED");
+        vm.writeFile(other, "PLACEHOLDER");
 
         string[] memory command = new string[](3);
         command[0] = "ln";

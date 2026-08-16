@@ -11,14 +11,9 @@ libs = ['dependencies']
 
 solc = "0.8.25"
 
-# Try to make sure the optimizer doesn't touch the output in a way that can break
-# source maps for debugging.
-# via_ir = false
-# optimizer = false
-# optimizer_runs = 0
-# optimizer_steps = 0
-
-# These settings should be used for snapshots
+# The generated sources under `src/generated/` pin a bytecode hash produced under
+# these settings, and `build-pointers.yaml` regenerates and fails on drift, so
+# changing them changes the committed output.
 optimizer = true
 optimizer_runs = 1000000
 

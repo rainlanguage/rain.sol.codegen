@@ -3,7 +3,6 @@ version = 1
 [[annotations]]
 path = [
   ".audit/**/",
-  ".gas-snapshot",
   ".github/workflows/**/",
   ".gitignore",
   ".soldeerignore",

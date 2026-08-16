@@ -46,6 +46,13 @@ library LibFs {
     /// `GENERATED_DIR` is created if it does not exist, so the first generation
     /// in a repo does not need it committed already.
     ///
+    /// The whole file content is built before anything on disk is touched, and
+    /// building it reverts for an `instance` that holds no code. Cheatcode
+    /// filesystem effects survive the revert that ends the run, so ordering the
+    /// build first is what keeps a failed generation from leaving the directory
+    /// worse than it found it: nothing is created, unlinked or written unless
+    /// there is content to write.
+    ///
     /// Anything already at the path is unlinked before the write, so a symlink
     /// there is replaced by a regular file rather than written through to its
     /// target, and the path does not exist between the unlink and the write.
@@ -63,6 +70,8 @@ library LibFs {
     /// @param body The body of the contract file to be written.
     function buildFileForContract(Vm vm, address instance, string memory contractName, string memory body) internal {
         string memory path = pathForContract(contractName);
+        string memory content =
+            string.concat(LibCodeGen.filePrefix(), LibCodeGen.bytecodeHashConstantString(vm, instance), body);
         //forge-lint: disable-next-line(unsafe-cheatcode)
         vm.createDir(GENERATED_DIR, true);
         if (vm.exists(path)) {
@@ -70,8 +79,6 @@ library LibFs {
             vm.removeFile(path);
         }
         //forge-lint: disable-next-line(unsafe-cheatcode)
-        vm.writeFile(
-            path, string.concat(LibCodeGen.filePrefix(), LibCodeGen.bytecodeHashConstantString(vm, instance), body)
-        );
+        vm.writeFile(path, content);
     }
 }

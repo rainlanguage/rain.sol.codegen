@@ -3,9 +3,11 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibHexString} from "src/lib/LibHexString.sol";
+import {Vm} from "forge-std-1.16.1/src/Vm.sol";
+import {LibHexString, UnexpectedHexString} from "src/lib/LibHexString.sol";
 import {LibCodeGen} from "src/lib/LibCodeGen.sol";
 import {LibHexStringExternal} from "test/concrete/LibHexStringExternal.sol";
+import {NonConformingVm} from "test/concrete/NonConformingVm.sol";
 
 /// @title LibHexStringBytesToHexTest
 /// @notice `bytesToHex` converts bytes to their hex representation with the
@@ -251,5 +253,142 @@ contract LibHexStringBytesToHexTest is Test {
         string memory hexString = LibHexString.bytesToHex(vm, data);
         assertEq(bytes(hexString).length, 600);
         assertEq(vm.parseBytes(string.concat("0x", hexString)), data);
+    }
+
+    /// The `Vm` is a parameter, so the string the prefix is stripped from is
+    /// whatever the caller's `Vm` returns. The strip is only valid on a string
+    /// of `2 * data.length + 2` characters beginning `0x`, and everything below
+    /// pins that the library checks that rather than assuming it. The library
+    /// call is forced across the ABI boundary because the revert has to happen
+    /// in a subcall for `expectRevert` to see it.
+    ///
+    /// An empty return underflows the length word to `2**256 - 2` if it is not
+    /// caught, which is the loudest case and the one that never reverts on its
+    /// own.
+    function testBytesToHexRevertsOnEmptyVmOutput() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// One character underflows to `2**256 - 1`.
+    function testBytesToHexRevertsOnOneCharacterVmOutput() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("Z")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "Z", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// The quiet case. A return of the right length with no `0x` on it does not
+    /// underflow anything; it discards two characters of real data and hands
+    /// back `"bbcc"`, which reaches generated source as a `hex"..."` literal
+    /// that compiles and holds the wrong value.
+    function testBytesToHexRevertsOnUnprefixedVmOutput() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("aabbcc")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "aabbcc", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// Both characters of the prefix are checked, not just the second. The
+    /// second character here is a correct `x`, so only the check on the first
+    /// character rejects this.
+    function testBytesToHexRevertsOnWrongFirstPrefixCharacter() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("Zxaabb")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "Zxaabb", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// Both characters of the prefix are checked, not just the first. The first
+    /// character here is a correct `0`, so only the check on the second
+    /// character rejects this.
+    function testBytesToHexRevertsOnWrongSecondPrefixCharacter() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0Xaabb")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0Xaabb", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// A correctly prefixed return that is too short for the data encodes fewer
+    /// bytes than it claims to. Nothing about the prefix is wrong, so only the
+    /// length check catches it.
+    function testBytesToHexRevertsOnTruncatedVmOutput() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0xaa")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0xaa", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// The length is an equality, not a lower bound, so a return that is too
+    /// long is rejected as well.
+    function testBytesToHexRevertsOnOverlongVmOutput() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("0xaabbcc")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "0xaabbcc", uint256(6)));
+        external_.bytesToHex(badVm, hex"aabb");
+    }
+
+    /// Empty data still requires the two prefix characters, so the shortest
+    /// return the library accepts is `0x` and the required length at the bottom
+    /// of the range is 2, not 0. An empty return here is short by exactly the
+    /// prefix and must be a revert rather than an out of bounds read.
+    function testBytesToHexRevertsOnEmptyVmOutputForEmptyData() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm("")));
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, "", uint256(2)));
+        external_.bytesToHex(badVm, "");
+    }
+
+    /// The check gates on the shape of the returned string, not on the identity
+    /// of the `Vm`. A conforming `Vm` that is not foundry's is still stripped
+    /// and returned, so the guard does not quietly narrow the parameter to the
+    /// cheatcode address.
+    function testBytesToHexAcceptsConformingVm() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm conformingVm = Vm(address(new NonConformingVm("0xaabb")));
+        assertEq(external_.bytesToHex(conformingVm, hex"aabb"), "aabb");
+    }
+
+    /// The tightest accepted return: the whole string is prefix and nothing is
+    /// left, which is what foundry's `Vm` returns for empty data.
+    function testBytesToHexAcceptsConformingVmForEmptyData() external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm conformingVm = Vm(address(new NonConformingVm("0x")));
+        string memory hexString = external_.bytesToHex(conformingVm, "");
+        uint256 rawLength;
+        assembly ("memory-safe") {
+            rawLength := mload(hexString)
+        }
+        assertEq(rawLength, 0);
+        assertEq(hexString, "");
+    }
+
+    /// The property behind every case above: for any data and any string a `Vm`
+    /// might return, the library either reverts or returns exactly that string
+    /// with its first two characters removed. Conformance is derived here from
+    /// the definition of `toString(bytes)` rather than read back off the
+    /// library, so nothing gets through that does not match the definition.
+    function testBytesToHexRejectsEveryNonConformingVmOutput(bytes memory data, string memory toStringReturn) external {
+        LibHexStringExternal external_ = new LibHexStringExternal();
+        Vm badVm = Vm(address(new NonConformingVm(toStringReturn)));
+
+        bytes memory returned = bytes(toStringReturn);
+        uint256 expectedLength = data.length * 2 + 2;
+        // The length equality implies at least 2 characters, so the prefix
+        // reads only happen once indexing them is in bounds.
+        bool conforms = returned.length == expectedLength && returned[0] == bytes1("0") && returned[1] == bytes1("x");
+
+        if (conforms) {
+            bytes memory expected = new bytes(returned.length - 2);
+            for (uint256 i = 2; i < returned.length; i++) {
+                expected[i - 2] = returned[i];
+            }
+            assertEq(external_.bytesToHex(badVm, data), string(expected));
+        } else {
+            vm.expectRevert(abi.encodeWithSelector(UnexpectedHexString.selector, toStringReturn, expectedLength));
+            external_.bytesToHex(badVm, data);
+        }
     }
 }

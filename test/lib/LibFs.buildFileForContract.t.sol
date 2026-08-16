@@ -4,7 +4,8 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibFs} from "src/lib/LibFs.sol";
-import {LibCodeGen, InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {Build} from "script/Build.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
@@ -199,28 +200,30 @@ contract LibFsBuildFileForContractTest is Test {
     }
 
     /// `src/generated/CodeGennable.sol` is committed, and `script/Build.sol`
-    /// builds it through this function. Nothing in `forge test` noticed when it
-    /// went stale — only the separate `rainix-copy-artifacts` job did, by
-    /// regenerating and diffing. This asserts the committed file still opens
-    /// with what `buildFileForContract` writes today, so drift between the
-    /// library and the artifact it produced reds the suite too.
+    /// writes it. Rerunning that script and comparing every byte of what it
+    /// produces against what is committed is what makes a stale artifact red
+    /// `forge test` rather than only the separate `rainix-copy-artifacts` job.
+    /// It is the whole generation pipeline that is rerun, so the body the
+    /// artifact carries is covered as well as its header, and `script/Build.sol`
+    /// is covered along with it.
     ///
-    /// Deliberately built from `LibCodeGen` here, unlike the tests above: the
-    /// claim is that the committed bytes match what the library emits now, so
-    /// the library is the correct side to read it from and the file on disk is
-    /// the oracle.
+    /// Deliberately built from the library and the script here, unlike the
+    /// tests above: the claim is that the committed bytes are what those emit
+    /// now, so they are the correct side to regenerate from and the file on
+    /// disk is the oracle.
+    ///
+    /// The committed bytes are read before the regeneration and written back
+    /// after it, so the working tree is left as it was found whichever way the
+    /// comparison goes.
     function testBuildFileForContractCommittedArtifactIsCurrent() external {
-        address instance = address(new CodeGennable());
-        string memory header =
-            string.concat(LibCodeGen.filePrefix(), LibCodeGen.bytecodeHashConstantString(vm, instance));
-        bytes memory committed = bytes(vm.readFile(LibFs.pathForContract("CodeGennable")));
+        string memory path = LibFs.pathForContract("CodeGennable");
+        string memory committed = vm.readFile(path);
 
-        assertTrue(committed.length >= bytes(header).length, "committed artifact is shorter than the header");
-        bytes memory actual = new bytes(bytes(header).length);
-        for (uint256 i = 0; i < actual.length; i++) {
-            actual[i] = committed[i];
-        }
-        assertEq(actual, bytes(header), "committed artifact is stale, regenerate with script/Build.sol");
+        new Build().run();
+        string memory regenerated = vm.readFile(path);
+        vm.writeFile(path, committed);
+
+        assertEq(regenerated, committed, "committed artifact is stale, regenerate with script/Build.sol");
     }
 
     /// The bytecode hash is read from the instance that was passed in, not from

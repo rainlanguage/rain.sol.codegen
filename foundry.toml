@@ -31,11 +31,8 @@ evm_version = "cancun"
 # this library does when it finds one at a generated path build it with `ln`.
 ffi = true
 
-# The project is readable so that the suite can assert properties over the
-# repo's own files, including the paths REUSE.toml annotates. The longest
-# matching path wins, so `src/generated` and `meta` stay writable.
 fs_permissions = [
-  { access = "read", path = "." },
+  { access = "read", path = "foundry.toml" },
   { access = "read-write", path = "src/generated" },
   { access = "read-write", path = "meta" },
 ]

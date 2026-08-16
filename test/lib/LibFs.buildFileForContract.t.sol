@@ -31,10 +31,11 @@ contract LibFsBuildFileForContractTest is Test {
         iExternal = new LibFsExternal();
     }
 
-    /// Every test writes under `src/generated/`, which is a committed directory
-    /// in this repo. Each test owns a distinct name so parallel suites cannot
-    /// collide, none of them is `CodeGennable` (the committed artifact), and
-    /// each removes its file again.
+    /// The tests that call this write under `src/generated/`, which is a
+    /// committed directory in this repo. Each owns a distinct name so parallel
+    /// suites cannot collide, and none of them is `CodeGennable`: the committed
+    /// artifact is regenerated and written back by its own test rather than
+    /// removed here.
     function cleanup(string memory contractName) internal {
         string memory path = LibFs.pathForContract(contractName);
         if (vm.exists(path)) {

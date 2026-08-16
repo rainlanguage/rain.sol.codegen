@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibCodeGen, MAX_LINE_LENGTH, InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, MAX_LINE_LENGTH, InvalidContractName, EmptyMeta} from "src/lib/LibCodeGen.sol";
 import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
 
 /// @dev `describedByMetaHashConstantString` reads `meta/<name>.rain.meta`, and
@@ -151,6 +151,34 @@ contract LibCodeGenDescribedByMetaHashConstantStringTest is Test {
                 keccak256(meta)
             )
         );
+    }
+
+    /// A meta file that holds no bytes is refused rather than described. Its
+    /// keccak256 is `keccak256("")`, which is the same value for every contract
+    /// and carries nothing of the file it came from, so a constant holding it
+    /// names no meta at all. The refusal is on the file, so the error carries
+    /// the path rather than the name it was built from.
+    function testDescribedByMetaHashConstantStringRejectsEmptyMeta() external {
+        vm.writeFileBinary(fixturePath("RejectsEmpty"), hex"");
+        assertEq(vm.readFileBinary(fixturePath("RejectsEmpty")).length, 0, "precondition: file holds no bytes");
+
+        vm.expectRevert(abi.encodeWithSelector(EmptyMeta.selector, fixturePath("RejectsEmpty")));
+        this.callDescribedByMetaHash(fixtureName("RejectsEmpty"));
+
+        vm.removeFile(fixturePath("RejectsEmpty"));
+    }
+
+    /// One byte is enough: the refusal is on the file holding nothing, not on
+    /// its contents being too short to be real meta. `keccak256(hex"00")` is a
+    /// different value from `keccak256("")`, so the constant still names the
+    /// file it came from.
+    function testDescribedByMetaHashConstantStringAcceptsAnyNonEmptyMeta() external {
+        bytes memory meta = hex"00";
+        vm.writeFileBinary(fixturePath("AcceptsAnyNonEmpty"), meta);
+        string memory emitted = LibCodeGen.describedByMetaHashConstantString(vm, fixtureName("AcceptsAnyNonEmpty"));
+        vm.removeFile(fixturePath("AcceptsAnyNonEmpty"));
+
+        assertEq(emitted, string.concat(DESCRIBED_BY_META_HASH_PREFIX, vm.toString(keccak256(meta)), ");\n"));
     }
 
     /// The name is interpolated into a path, so a name that is not a Solidity

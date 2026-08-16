@@ -1,6 +1,6 @@
 [package]
 name = "rain-sol-codegen"
-version = "0.1.16"
+version = "0.1.17"
 
 [profile.default]
 src = 'src'

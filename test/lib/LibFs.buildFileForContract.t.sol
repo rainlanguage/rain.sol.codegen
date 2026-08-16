@@ -245,6 +245,52 @@ contract LibFsBuildFileForContractTest is Test {
         cleanup(name);
     }
 
+    /// Whatever is already at the path is unlinked before the write, so the
+    /// write lands on a new file rather than through the one that was there.
+    ///
+    /// A hard link is what makes that observable. Two names for one file: a
+    /// write through either name is visible under both, so a write that goes
+    /// through the path shows up under the other name, and a write that
+    /// follows an unlink cannot. Without the unlink `vm.writeFile` truncates
+    /// and rewrites the file already at the path, which is the same file the
+    /// other name refers to.
+    ///
+    /// A symlink cannot witness this. `vm.removeFile` resolves the link and
+    /// removes the target rather than the link, `vm.writeFile` follows the link
+    /// and writes the target, and `vm.exists` resolves the link too, so with
+    /// and without the unlink both end at the target.
+    ///
+    /// forge-std 1.16.1 reads a link (`readLink`) but creates neither kind, so
+    /// the link is made by shelling out, which is what `ffi` in `foundry.toml`
+    /// is for.
+    function testBuildFileForContractUnlinksBeforeWriting() external {
+        string memory name = "LibFsBuildUnlink";
+        string memory path = LibFs.pathForContract(name);
+        string memory other = "src/generated/LibFsBuildUnlinkOther.txt";
+        cleanupPath(path);
+        cleanupPath(other);
+        vm.writeFile(other, "LINKED");
+
+        string[] memory command = new string[](3);
+        command[0] = "ln";
+        command[1] = other;
+        command[2] = path;
+        vm.ffi(command);
+
+        vm.writeFile(other, "SHARED");
+        assertEq(vm.readFile(path), "SHARED", "precondition: the two paths are not one file");
+
+        address instance = address(new CodeGennable());
+        string memory body = "\n// unlink\n";
+        LibFs.buildFileForContract(vm, instance, name, body);
+
+        assertEq(vm.readFile(other), "SHARED", "the write went through the file that was already at the path");
+        assertEq(vm.readFile(path), expectedFile(instance, body));
+
+        cleanupPath(path);
+        cleanupPath(other);
+    }
+
     /// Removes whatever is at `path`, so that a test asserting nothing was
     /// written there establishes its own precondition rather than assuming one.
     function cleanupPath(string memory path) internal {

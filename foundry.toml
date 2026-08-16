@@ -33,6 +33,12 @@ fs_permissions = [
   { access = "read-write", path = "meta" },
 ]
 
+# `LibCodeGen`'s wrap arithmetic is computed against these, so they are stated
+# here rather than inherited from whatever the formatter currently defaults to.
+[fmt]
+line_length = 120
+tab_width = 4
+
 [fuzz]
 runs = 2048
 

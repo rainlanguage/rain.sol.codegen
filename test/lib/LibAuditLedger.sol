@@ -96,6 +96,10 @@ library LibAuditLedger {
     /// timestamp leave which of them is newest undecidable, so equality is a
     /// violation.
     ///
+    /// Both timestamps must already have passed `requireTimestampShape`, which
+    /// is what makes them the same length and makes comparing them as bytes the
+    /// same as comparing them as times.
+    ///
     /// Reverts with `ScanLedgerOutOfOrder` if it is not.
     /// @param index The index of the record carrying `later`.
     /// @param earlier The timestamp of the record at `index - 1`.

@@ -18,15 +18,17 @@ import {AuditLedgerExternal} from "test/concrete/AuditLedgerExternal.sol";
 /// written down.
 contract MutationTestScansTest is Test {
     /// The committed scan ledger this repo's readers treat as authoritative.
-    string constant LEDGER_PATH = "audit/mutation-test-scans.json";
+    string internal constant LEDGER_PATH = "audit/mutation-test-scans.json";
 
     /// A well formed timestamp the fixtures vary one character of at a time.
-    string constant BASE_TIMESTAMP = "2026-08-16T14:55:16Z";
+    string internal constant BASE_TIMESTAMP = "2026-08-16T14:55:16Z";
 
-    AuditLedgerExternal internal ledger;
+    /// `vm.expectRevert` needs a call frame, and `requireAppendOrder` is an
+    /// internal library function that is inlined into its caller.
+    AuditLedgerExternal internal immutable iLedger;
 
-    function setUp() external {
-        ledger = new AuditLedgerExternal();
+    constructor() {
+        iLedger = new AuditLedgerExternal();
     }
 
     /// The positions of `YYYY-MM-DDTHH:MM:SSZ` that hold a digit.
@@ -71,13 +73,13 @@ contract MutationTestScansTest is Test {
     /// A ledger with no records has no newest scan.
     function testEmptyLedgerRejected() external {
         vm.expectRevert(abi.encodeWithSelector(EmptyScanLedger.selector));
-        ledger.requireAppendOrder(vm, "[]");
+        iLedger.requireAppendOrder(vm, "[]");
     }
 
     /// A record with no timestamp cannot be placed in the order.
     function testMissingTimestampRejected() external {
         vm.expectRevert(abi.encodeWithSelector(MissingScanTimestamp.selector, 1));
-        ledger.requireAppendOrder(
+        iLedger.requireAppendOrder(
             vm, string.concat("[{\"timestamp\":\"", BASE_TIMESTAMP, "\"},{\"commit\":\"c72eb89\"}]")
         );
     }
@@ -86,14 +88,14 @@ contract MutationTestScansTest is Test {
     function testShortTimestampRejected() external {
         string memory short = "2026-08-16T14:55:16";
         vm.expectRevert(abi.encodeWithSelector(MalformedScanTimestamp.selector, 0, short));
-        ledger.requireAppendOrder(vm, ledgerJson(short, BASE_TIMESTAMP));
+        iLedger.requireAppendOrder(vm, ledgerJson(short, BASE_TIMESTAMP));
     }
 
     /// A timestamp longer than the shape is not comparable.
     function testLongTimestampRejected() external {
         string memory long = "2026-08-16T14:55:16.5Z";
         vm.expectRevert(abi.encodeWithSelector(MalformedScanTimestamp.selector, 0, long));
-        ledger.requireAppendOrder(vm, ledgerJson(long, BASE_TIMESTAMP));
+        iLedger.requireAppendOrder(vm, ledgerJson(long, BASE_TIMESTAMP));
     }
 
     /// Every literal position of the shape is required, so a swapped separator
@@ -105,7 +107,7 @@ contract MutationTestScansTest is Test {
             bytes memory timestamp = abi.encodePacked(BASE_TIMESTAMP);
             timestamp[literals[i]] = "_";
             vm.expectRevert(abi.encodeWithSelector(MalformedScanTimestamp.selector, 0, string(timestamp)));
-            ledger.requireAppendOrder(vm, ledgerJson(string(timestamp), BASE_TIMESTAMP));
+            iLedger.requireAppendOrder(vm, ledgerJson(string(timestamp), BASE_TIMESTAMP));
         }
     }
 
@@ -117,7 +119,7 @@ contract MutationTestScansTest is Test {
             bytes memory timestamp = abi.encodePacked(BASE_TIMESTAMP);
             timestamp[positions[i]] = "x";
             vm.expectRevert(abi.encodeWithSelector(MalformedScanTimestamp.selector, 0, string(timestamp)));
-            ledger.requireAppendOrder(vm, ledgerJson(string(timestamp), BASE_TIMESTAMP));
+            iLedger.requireAppendOrder(vm, ledgerJson(string(timestamp), BASE_TIMESTAMP));
         }
     }
 
@@ -125,7 +127,7 @@ contract MutationTestScansTest is Test {
     function testMalformedTimestampReportsItsOwnIndex() external {
         string memory malformed = "2026-08-16T14:55:1xZ";
         vm.expectRevert(abi.encodeWithSelector(MalformedScanTimestamp.selector, 1, malformed));
-        ledger.requireAppendOrder(vm, ledgerJson(BASE_TIMESTAMP, malformed));
+        iLedger.requireAppendOrder(vm, ledgerJson(BASE_TIMESTAMP, malformed));
     }
 
     /// Records appended oldest to newest satisfy the rule.
@@ -142,14 +144,14 @@ contract MutationTestScansTest is Test {
     function testDescendingLedgerRejected() external {
         string memory newer = "2026-08-17T09:00:00Z";
         vm.expectRevert(abi.encodeWithSelector(ScanLedgerOutOfOrder.selector, 1, newer, BASE_TIMESTAMP));
-        ledger.requireAppendOrder(vm, ledgerJson(newer, BASE_TIMESTAMP));
+        iLedger.requireAppendOrder(vm, ledgerJson(newer, BASE_TIMESTAMP));
     }
 
     /// Two records sharing a timestamp leave which of them is newest
     /// undecidable.
     function testEqualTimestampsRejected() external {
         vm.expectRevert(abi.encodeWithSelector(ScanLedgerOutOfOrder.selector, 1, BASE_TIMESTAMP, BASE_TIMESTAMP));
-        ledger.requireAppendOrder(vm, ledgerJson(BASE_TIMESTAMP, BASE_TIMESTAMP));
+        iLedger.requireAppendOrder(vm, ledgerJson(BASE_TIMESTAMP, BASE_TIMESTAMP));
     }
 
     /// The violation is reported at the first record that breaks the order, not
@@ -161,7 +163,7 @@ contract MutationTestScansTest is Test {
         timestamps[2] = "2026-08-16T23:59:59Z";
         timestamps[3] = "2027-01-01T00:00:00Z";
         vm.expectRevert(abi.encodeWithSelector(ScanLedgerOutOfOrder.selector, 2, timestamps[1], timestamps[2]));
-        ledger.requireAppendOrder(vm, ledgerJson(timestamps));
+        iLedger.requireAppendOrder(vm, ledgerJson(timestamps));
     }
 
     /// The order is decided by every digit of the timestamp, so a difference at
@@ -178,6 +180,6 @@ contract MutationTestScansTest is Test {
         LibAuditLedger.requireAppendOrder(vm, ledgerJson(low, high));
 
         vm.expectRevert(abi.encodeWithSelector(ScanLedgerOutOfOrder.selector, 1, high, low));
-        ledger.requireAppendOrder(vm, ledgerJson(high, low));
+        iLedger.requireAppendOrder(vm, ledgerJson(high, low));
     }
 }

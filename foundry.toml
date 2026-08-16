@@ -32,9 +32,6 @@ evm_version = "cancun"
 ffi = true
 
 fs_permissions = [
-  # `.soldeerignore` is a claim about what is at the repo root, so the test that
-  # holds it against the root has to be able to list the root.
-  { access = "read", path = "./" },
   { access = "read", path = "foundry.toml" },
   { access = "read-write", path = "src/generated" },
   { access = "read-write", path = "meta" },

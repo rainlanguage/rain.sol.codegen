@@ -12,6 +12,7 @@
 /flake.lock
 /flake.nix
 /foundry.toml
+/meta
 /out
 /remappings.txt
 /slither.config.json

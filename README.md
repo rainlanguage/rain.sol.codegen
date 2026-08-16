@@ -28,6 +28,22 @@ Via [soldeer](https://soldeer.xyz):
 forge soldeer install rain-sol-codegen~<version>
 ```
 
+forge-std is a prerequisite, not a transitive install. Every library here
+imports `forge-std-1.16.1/src/Vm.sol`; the published package carries no
+`foundry.toml`, `soldeer.lock` or `remappings.txt`, and soldeer writes
+remappings only for a project's own direct dependencies. Nothing supplies that
+prefix on your behalf, so install forge-std in the consuming project too:
+
+```sh
+forge soldeer install forge-std~1.16.1
+```
+
+which adds `forge-std-1.16.1/=dependencies/forge-std-1.16.1/` to your
+`remappings.txt`. A forge-std obtained any other way — a git submodule under
+`lib/`, an unversioned soldeer remapping prefix — needs that exact prefix mapped
+by hand, otherwise importing anything from this package fails to compile with
+`Source "forge-std-1.16.1/src/Vm.sol" not found`.
+
 ## Develop
 
 This repo uses [nix](https://nixos.org/download.html). The default shell is the

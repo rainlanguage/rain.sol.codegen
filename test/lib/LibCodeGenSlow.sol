@@ -23,6 +23,12 @@ string constant SLOW_WRAP = "\n    ";
 /// those magic numbers is right. Every string here is spelled out again rather
 /// than imported, so a change to a literal in `LibCodeGen` shows up as a
 /// disagreement instead of moving both sides at once.
+///
+/// The empty comment case is the one place the two sides state the same rule
+/// rather than deriving it independently: a declaration is preceded by one
+/// blank line, and by a comment line only when there is a comment. The exact
+/// text of both cases is pinned separately by literal assertions, so this
+/// reference is not the only thing holding it.
 library LibCodeGenSlow {
     /// `vm.toString` on a `bytes` always prefixes `0x`, which a `hex"..."`
     /// literal must not carry. Dropped by copying the tail one byte at a time so
@@ -53,9 +59,7 @@ library LibCodeGenSlow {
         returns (string memory)
     {
         return string.concat(
-            "\n",
-            comment,
-            "\n",
+            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
             joinSlow(string.concat("bytes constant ", name, " ="), string.concat("hex\"", hexOfSlow(vm, data), "\";")),
             "\n"
         );
@@ -67,9 +71,7 @@ library LibCodeGenSlow {
         returns (string memory)
     {
         return string.concat(
-            "\n",
-            comment,
-            "\n",
+            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
             joinSlow(string.concat("uint8 constant ", name, " ="), string.concat(vm.toString(uint256(data)), ";")),
             "\n"
         );
@@ -81,9 +83,7 @@ library LibCodeGenSlow {
         returns (string memory)
     {
         return string.concat(
-            "\n",
-            comment,
-            "\n",
+            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
             joinSlow(
                 string.concat("bytes32 constant ", name, " ="), string.concat("bytes32(", vm.toString(data), ");")
             ),
@@ -97,9 +97,7 @@ library LibCodeGenSlow {
         returns (string memory)
     {
         return string.concat(
-            "\n",
-            comment,
-            "\n",
+            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
             joinSlow(
                 string.concat("address constant ", name, " ="), string.concat("address(", vm.toString(data), ");")
             ),

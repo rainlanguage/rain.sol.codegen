@@ -13,6 +13,6 @@ interface ISubParserToolingV1 {
     /// efficiency. As the process is deterministic for a given source and
     /// compiler configuration, the output can be tested against the used value
     /// in CI and the translation from source to parsers can also be tested in
-    /// CI. See .github/workflows/git-clean.yaml for an example of such a test.
+    /// CI. See .github/workflows/build-pointers.yaml for an example of such a test.
     function buildSubParserWordParsers() external pure returns (bytes memory);
 }

@@ -2,9 +2,8 @@ name: build-pointers
 on: [push]
 jobs:
   build-pointers:
-    # Unified artifact action (rainix#201): runs BuildPointers.sol (this repo
-    # has no CopyArtifacts.sol, so that step is skipped) and asserts the
-    # committed pointer artifacts still match. Replaces the retired
-    # rainix-build-pointers reusable. secrets: inherit carries CACHIX_AUTH_TOKEN.
+    # Runs script/Build.sol (this repo has no CopyArtifacts.sol, so that step is
+    # skipped) and asserts the committed generated sources still match.
+    # secrets: inherit carries CACHIX_AUTH_TOKEN.
     uses: rainlanguage/rainix/.github/workflows/rainix-copy-artifacts.yaml@main
     secrets: inherit

@@ -97,4 +97,22 @@ contract LibCodeGenUint8ConstantStringTest is Test {
         );
         assertEq(vm.parseUint(vm.toString(uint256(data))), uint256(data));
     }
+
+    /// An empty comment emits no comment line rather than an empty one. Two
+    /// consecutive newlines are a blank line that `forge fmt` collapses, so a
+    /// generated file carrying one is not stable under the formatter and a
+    /// consumer's `forge fmt --check` reds when it regenerates.
+    function testUint8ConstantStringEmptyComment() external pure {
+        assertEq(LibCodeGen.uint8ConstantString(vm, "", "NO_COMMENT", 7), "\nuint8 constant NO_COMMENT = 7;\n");
+    }
+
+    /// The comment is the only thing an empty comment removes: the declaration
+    /// that follows it is byte for byte the same either way, including the
+    /// blank line that separates it from whatever precedes it.
+    function testUint8ConstantStringEmptyCommentKeepsDeclaration() external pure {
+        assertEq(
+            LibCodeGen.uint8ConstantString(vm, "/// @dev Seven.", "NO_COMMENT", 7),
+            string.concat("\n/// @dev Seven.", LibCodeGen.uint8ConstantString(vm, "", "NO_COMMENT", 7))
+        );
+    }
 }

@@ -3,14 +3,13 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, MAX_LINE_LENGTH, InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
 
 /// @dev `describedByMetaHashConstantString` reads `meta/<name>.rain.meta`, and
-/// this repo's `fs_permissions` grants no read under `meta`. `src/generated` is
-/// the one directory it grants read-write, so a fixture goes there and the name
-/// walks back out of `meta` to reach it. That the name reaches the path at all
-/// is itself asserted below.
+/// this repo's `fs_permissions` grants read-write on `meta`, so a fixture goes
+/// there under the name the library is given. That the name reaches the path at
+/// all is itself asserted below.
 ///
 /// The fixture file is real, shared, mutable state that outlives the EVM: every
 /// test here writes it and then removes it. A single path shared across the
@@ -32,27 +31,35 @@ string constant DESCRIBED_BY_META_HASH_PREFIX =
 /// @notice `describedByMetaHashConstantString` builds a path out of the name it
 /// is given, reads that file, and puts the hash of its contents into a constant.
 contract LibCodeGenDescribedByMetaHashConstantStringTest is Test {
-    /// Reachable only through an external call so that a refused read can be
-    /// caught and inspected rather than aborting the test.
+    /// `meta/` holds no committed file, so nothing in a fresh clone creates it
+    /// and `vm.writeFileBinary` does not create a parent directory. Every
+    /// fixture below is removed again, which leaves the directory empty and so
+    /// invisible to git.
+    function setUp() external {
+        vm.createDir("meta", true);
+    }
+
+    /// Reachable only through an external call so that a refused or failed read
+    /// can be caught and inspected rather than aborting the test.
     function callDescribedByMetaHash(string memory name) external view returns (string memory) {
         return LibCodeGen.describedByMetaHashConstantString(vm, name);
     }
 
     /// The path this test's own fixture is written to, relative to the repo root.
     function fixturePath(string memory owner) internal pure returns (string memory) {
-        return string.concat("src/generated/", FIXTURE_STEM, owner, ".rain.meta");
+        return string.concat("meta/", FIXTURE_STEM, owner, ".rain.meta");
     }
 
-    /// The name that makes the library build `fixturePath(owner)`: it walks back
-    /// out of the `meta/` directory the library prepends, and stops short of the
-    /// `.rain.meta` the library appends.
+    /// The name that makes the library build `fixturePath(owner)`. It stops
+    /// short of the `.rain.meta` the library appends, and is a Solidity
+    /// identifier because the library rejects a name that is not one.
     function fixtureName(string memory owner) internal pure returns (string memory) {
-        return string.concat("../src/generated/", FIXTURE_STEM, owner);
+        return string.concat(FIXTURE_STEM, owner);
     }
 
     /// The path is `meta/<name>.rain.meta`. The name is not a file that exists
-    /// here, so the path is observed through the access refusal, which quotes
-    /// the path that was asked for. Two names, because a hard coded path would
+    /// here, so the path is observed through the failed open, which quotes the
+    /// path that was asked for. Two names, because a hard coded path would
     /// satisfy one of them.
     function testDescribedByMetaHashConstantStringPath() external {
         assertRequestsPath("CodeGennable", "meta/CodeGennable.rain.meta");
@@ -107,14 +114,73 @@ contract LibCodeGenDescribedByMetaHashConstantStringTest is Test {
     }
 
     /// The name is fixed and so is the length of a `bytes32` literal, so this
-    /// declaration can never need wrapping. Asserted rather than assumed,
-    /// because this function does its own concatenation instead of going through
-    /// `bytes32ConstantString` and so has no wrap decision at all.
+    /// declaration fits on one line. `DESCRIBED_BY_META_HASH` is the longest
+    /// constant name this library chooses for itself, at 118 of the 120
+    /// characters available, so it is the one measured.
     function testDescribedByMetaHashConstantStringFitsMaxLength() external {
         vm.writeFileBinary(fixturePath("FitsMaxLength"), hex"1234");
         string memory emitted = LibCodeGen.describedByMetaHashConstantString(vm, fixtureName("FitsMaxLength"));
         vm.removeFile(fixturePath("FitsMaxLength"));
 
         assertLe(LibCodeGenSlow.longestLineSlow(emitted), MAX_LINE_LENGTH);
+    }
+
+    /// The declaration is the one `bytes32ConstantString` builds, so it carries
+    /// the same wrap decision as every other `bytes32` constant rather than an
+    /// unconditional space of its own. Measured against the naive reference,
+    /// which builds the one line form and measures it, so this holds only while
+    /// the emitted line is what that measurement says it should be.
+    ///
+    /// Not fuzzed over the meta, unlike the `bytes32` suite this shares its
+    /// reference with: the meta only reaches the declaration as its `keccak256`,
+    /// and a `bytes32` is 66 characters whatever it is, so a second value could
+    /// not reach a different wrap decision. Fuzzing it would only add fixture
+    /// writes to a real directory.
+    function testDescribedByMetaHashConstantStringMatchesMeasuredLine() external {
+        bytes memory meta = hex"1234";
+        vm.writeFileBinary(fixturePath("MatchesMeasuredLine"), meta);
+        string memory emitted = LibCodeGen.describedByMetaHashConstantString(vm, fixtureName("MatchesMeasuredLine"));
+        vm.removeFile(fixturePath("MatchesMeasuredLine"));
+
+        assertEq(
+            emitted,
+            LibCodeGenSlow.bytes32ConstantStringSlow(
+                vm,
+                "/// @dev The hash of the meta that describes the contract.",
+                "DESCRIBED_BY_META_HASH",
+                keccak256(meta)
+            )
+        );
+    }
+
+    /// The name is interpolated into a path, so a name that is not a Solidity
+    /// identifier is refused before any read happens. `..` and `/` would
+    /// otherwise reach a file outside `meta/`, and an empty name would read
+    /// `meta/.rain.meta`.
+    function testDescribedByMetaHashConstantStringRejectsNonIdentifierName() external {
+        assertRejectsName("");
+        assertRejectsName("../src/generated/X");
+        assertRejectsName("../../etc/passwd");
+        assertRejectsName("sub/Foo");
+        assertRejectsName("Foo.rain");
+        assertRejectsName("Foo Bar");
+        assertRejectsName("Foo-Bar");
+        assertRejectsName("0Foo");
+    }
+
+    function assertRejectsName(string memory name) internal {
+        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, name));
+        this.callDescribedByMetaHash(name);
+    }
+
+    /// The identifier rule is Solidity's, not a narrower one: leading `_` and
+    /// `$`, and digits after the first character, are all part of a contract
+    /// name and are accepted. Proven by the read reaching the filesystem, which
+    /// only happens once the name is accepted.
+    function testDescribedByMetaHashConstantStringAcceptsIdentifierName() external {
+        assertRequestsPath("_Foo", "meta/_Foo.rain.meta");
+        assertRequestsPath("$Foo", "meta/$Foo.rain.meta");
+        assertRequestsPath("Foo1", "meta/Foo1.rain.meta");
+        assertRequestsPath("F0o_$1", "meta/F0o_$1.rain.meta");
     }
 }

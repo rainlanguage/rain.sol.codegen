@@ -29,9 +29,10 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
         );
     }
 
-    /// Zero is a real value, not a sentinel to special-case. It is also the value
-    /// a codehash constant wrongly takes when an instance is not passed, so it
-    /// must emit as plainly as any other.
+    /// Zero is a real value, not a sentinel to special-case. Whether a caller
+    /// should be emitting it is the caller's problem — `bytecodeHashConstantString`
+    /// refuses a codeless address for exactly that reason — and this function
+    /// emits it as plainly as any other value.
     function testBytes32ConstantStringZero() external view {
         assertEq(
             LibCodeGen.bytes32ConstantString(vm, "/// @dev Zero.", "ZERO", bytes32(0)),
@@ -84,6 +85,27 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
         assertEq(
             LibCodeGen.bytes32ConstantString(vm, comment, name, data),
             LibCodeGenSlow.bytes32ConstantStringSlow(vm, comment, name, data)
+        );
+    }
+
+    /// An empty comment emits no comment line rather than an empty one. Two
+    /// consecutive newlines are a blank line that `forge fmt` collapses, so a
+    /// generated file carrying one is not stable under the formatter and a
+    /// consumer's `forge fmt --check` reds when it regenerates.
+    function testBytes32ConstantStringEmptyComment() external view {
+        assertEq(
+            LibCodeGen.bytes32ConstantString(vm, "", "NO_COMMENT", SOME_HASH),
+            string.concat("\nbytes32 constant NO_COMMENT = bytes32(", SOME_HASH_STRING, ");\n")
+        );
+    }
+
+    /// The comment is the only thing an empty comment removes: the declaration
+    /// that follows it is byte for byte the same either way, including the
+    /// blank line that separates it from whatever precedes it.
+    function testBytes32ConstantStringEmptyCommentKeepsDeclaration() external view {
+        assertEq(
+            LibCodeGen.bytes32ConstantString(vm, "/// @dev Some hash.", "NO_COMMENT", SOME_HASH),
+            string.concat("\n/// @dev Some hash.", LibCodeGen.bytes32ConstantString(vm, "", "NO_COMMENT", SOME_HASH))
         );
     }
 }

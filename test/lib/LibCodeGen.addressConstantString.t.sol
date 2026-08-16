@@ -81,4 +81,27 @@ contract LibCodeGenAddressConstantStringTest is Test {
             LibCodeGenSlow.addressConstantStringSlow(vm, comment, name, data)
         );
     }
+
+    /// An empty comment emits no comment line rather than an empty one. Two
+    /// consecutive newlines are a blank line that `forge fmt` collapses, so a
+    /// generated file carrying one is not stable under the formatter and a
+    /// consumer's `forge fmt --check` reds when it regenerates.
+    function testAddressConstantStringEmptyComment() external view {
+        assertEq(
+            LibCodeGen.addressConstantString(vm, "", "NO_COMMENT", SOME_ADDRESS),
+            string.concat("\naddress constant NO_COMMENT = address(", SOME_ADDRESS_STRING, ");\n")
+        );
+    }
+
+    /// The comment is the only thing an empty comment removes: the declaration
+    /// that follows it is byte for byte the same either way, including the
+    /// blank line that separates it from whatever precedes it.
+    function testAddressConstantStringEmptyCommentKeepsDeclaration() external view {
+        assertEq(
+            LibCodeGen.addressConstantString(vm, "/// @dev Some address.", "NO_COMMENT", SOME_ADDRESS),
+            string.concat(
+                "\n/// @dev Some address.", LibCodeGen.addressConstantString(vm, "", "NO_COMMENT", SOME_ADDRESS)
+            )
+        );
+    }
 }

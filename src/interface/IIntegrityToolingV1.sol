@@ -15,6 +15,8 @@ interface IIntegrityToolingV1 {
     /// for efficiency. As the process is deterministic for a given source and
     /// compiler configuration, the output can be tested against the used value
     /// in CI and the translation from source to pointers can also be tested in
-    /// CI. See .github/workflows/build-pointers.yaml for an example of such a test.
+    /// CI. `script/Build.sol` in this package is a worked example of such a
+    /// generation, and the test is to run it in CI and fail on any diff against
+    /// the committed source.
     function buildIntegrityFunctionPointers() external view returns (bytes memory);
 }

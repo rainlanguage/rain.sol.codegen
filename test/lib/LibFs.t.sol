@@ -77,11 +77,15 @@ contract LibFsTest is Test {
         assertEq(slice(path, 14 + name.length, 4), bytes(".sol"), "extension");
     }
 
-    /// Two contracts must never be handed the same file: generation would
-    /// silently overwrite one with the other. Distinct names give distinct
-    /// paths. Both names are built from the alphabet, so the pair is drawn from
-    /// the domain the function accepts rather than from strings it refuses to
-    /// produce a path for at all.
+    /// Distinct names give distinct paths. Both names are built from the
+    /// alphabet, so the pair is drawn from the domain the function accepts
+    /// rather than from strings it refuses to produce a path for at all.
+    ///
+    /// Distinct paths are not distinct files everywhere. A case insensitive
+    /// filesystem resolves two paths that differ only in case to one file, so
+    /// two names that differ only in case share a generated file there and one
+    /// generation overwrites the other. That is a property of the filesystem
+    /// rather than of the path, which is why what is proven here is over paths.
     function testPathForContractDistinctNamesDistinctPaths(bytes memory seedA, bytes memory seedB) external pure {
         string memory a = LibCodeGenSlow.nameFromSeedSlow(seedA);
         string memory b = LibCodeGenSlow.nameFromSeedSlow(seedB);

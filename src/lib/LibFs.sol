@@ -27,7 +27,8 @@ library LibFs {
     ///
     /// An accepted name is interpolated verbatim, so it reaches the path byte
     /// for byte and is never quoted, escaped, trimmed, case folded or
-    /// truncated.
+    /// truncated. Names that differ only in case therefore give different
+    /// paths, which a case insensitive filesystem resolves to the same file.
     /// @param contractName The name of the contract, interpolated verbatim.
     /// @return The file path as a string.
     function pathForContract(string memory contractName) internal pure returns (string memory) {

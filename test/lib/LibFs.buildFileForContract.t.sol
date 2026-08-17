@@ -40,11 +40,12 @@ contract LibFsBuildFileForContractTest is Test {
         vm.createDir(GENERATED_DIR, true);
     }
 
-    /// Every test writes under `src/generated/`, which holds nothing committed
-    /// in this repo and is created on demand by `buildFileForContract` itself.
-    /// Everything that lands there during a run is this suite's scratch. Each
-    /// test owns a distinct name so parallel suites cannot collide, and each
-    /// removes its file again.
+    /// Called by the tests that generate a file. `src/generated/` holds nothing
+    /// committed in this repo, so everything that lands there during a run is
+    /// this suite's scratch. Each generating test owns a distinct name so
+    /// parallel suites cannot collide, and removes its file again. The tests
+    /// that assert a name is refused write nothing at all and do not come
+    /// through here.
     function cleanup(string memory contractName) internal {
         string memory path = LibFs.pathForContract(contractName);
         if (vm.exists(path)) {

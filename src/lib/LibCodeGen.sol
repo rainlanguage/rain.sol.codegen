@@ -26,10 +26,6 @@ error InvalidContractName(string name);
 /// @param instance The address that holds no code.
 error CodelessInstance(address instance);
 
-/// Thrown when a meta hash is asked for and the meta file holds no bytes.
-/// @param path The path of the file that holds no bytes.
-error EmptyMeta(string path);
-
 /// @title LibCodeGen
 /// @notice Library for generating Solidity code snippets for contract function
 /// pointers, code hashes, associated comments, etc. All snippets are returned
@@ -249,15 +245,6 @@ library LibCodeGen {
     /// Without the grant the read is refused by foundry rather than by this
     /// library, and the error names the permission rather than the missing
     /// grant.
-    ///
-    /// Reverts if the file holds no bytes. Such a file hashes to
-    /// `keccak256("")`, which is the same value whatever contract is being
-    /// generated and carries nothing of the file it was read from, so a
-    /// constant holding it names no meta rather than the meta that describes
-    /// this contract. Contents of any length at all are hashed as they are: the
-    /// refusal is on the file holding nothing, not on the contents being
-    /// something other than meta. A file that is absent rather than empty is
-    /// refused by the read.
     /// @param vm The Vm instance used to read the meta file and to format
     /// values as strings.
     /// @param name The name of the contract whose meta hash is to be computed.
@@ -267,11 +254,7 @@ library LibCodeGen {
     /// hash constant.
     function describedByMetaHashConstantString(Vm vm, string memory name) internal view returns (string memory) {
         requireContractName(name);
-        string memory path = string.concat("meta/", name, ".rain.meta");
-        bytes memory describedByMeta = vm.readFileBinary(path);
-        if (describedByMeta.length == 0) {
-            revert EmptyMeta(path);
-        }
+        bytes memory describedByMeta = vm.readFileBinary(string.concat("meta/", name, ".rain.meta"));
         return bytes32ConstantString(
             vm,
             "/// @dev The hash of the meta that describes the contract.",

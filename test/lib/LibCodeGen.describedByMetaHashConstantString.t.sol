@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibCodeGen, MAX_LINE_LENGTH, InvalidContractName, EmptyMeta} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, MAX_LINE_LENGTH, InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
 
 /// @dev `describedByMetaHashConstantString` reads `meta/<name>.rain.meta`, and
@@ -153,30 +153,48 @@ contract LibCodeGenDescribedByMetaHashConstantStringTest is Test {
         );
     }
 
-    /// A meta file that holds no bytes is refused rather than described. Its
-    /// keccak256 is `keccak256("")`, which is the same value for every contract
-    /// and carries nothing of the file it came from, so a constant holding it
-    /// names no meta at all. The refusal is on the file, so the error carries
-    /// the path rather than the name it was built from.
-    function testDescribedByMetaHashConstantStringRejectsEmptyMeta() external {
-        vm.writeFileBinary(fixturePath("RejectsEmpty"), hex"");
-        assertEq(vm.readFileBinary(fixturePath("RejectsEmpty")).length, 0, "precondition: file holds no bytes");
+    /// A meta file that holds no bytes is hashed like any other: the constant
+    /// carries `keccak256("")`. It is not refused, and this is where meta
+    /// deliberately parts company with `bytecodeHashConstantString`, which does
+    /// refuse the codeless address that arrives at that same value.
+    ///
+    /// The two are hashing different kinds of thing. Bytecode is necessarily
+    /// unique per contract, so a `codehash` of nothing pinned against an
+    /// address names no deployment, and an address that holds no code is the
+    /// address a caller lands on when they meant to deploy something — a
+    /// mistake in the call itself. Meta is documentation. Absent or shared
+    /// documentation is a normal state of a project rather than a mistake: two
+    /// contracts described the same way legitimately carry the same meta hash,
+    /// and a meta file not written yet is a documentation gap.
+    ///
+    /// Nor is "the same value whatever contract is being generated" a property
+    /// of emptiness in particular. `keccak256(hex"00")` is shared by every
+    /// contract whose meta file holds that one byte, which
+    /// `testDescribedByMetaHashConstantStringHashesAnyLength` below shows is
+    /// hashed as it is. What this function reports either way is the true hash
+    /// of the bytes that are there, so a consumer checking a blob against
+    /// `DESCRIBED_BY_META_HASH` and finding the blob empty gets a true answer
+    /// and nothing is falsely authenticated.
+    function testDescribedByMetaHashConstantStringHashesEmptyMeta() external {
+        vm.writeFileBinary(fixturePath("HashesEmpty"), hex"");
+        assertEq(vm.readFileBinary(fixturePath("HashesEmpty")).length, 0, "precondition: file holds no bytes");
 
-        vm.expectRevert(abi.encodeWithSelector(EmptyMeta.selector, fixturePath("RejectsEmpty")));
-        this.callDescribedByMetaHash(fixtureName("RejectsEmpty"));
+        string memory emitted = LibCodeGen.describedByMetaHashConstantString(vm, fixtureName("HashesEmpty"));
+        vm.removeFile(fixturePath("HashesEmpty"));
 
-        vm.removeFile(fixturePath("RejectsEmpty"));
+        assertEq(emitted, string.concat(DESCRIBED_BY_META_HASH_PREFIX, vm.toString(keccak256("")), ");\n"));
     }
 
-    /// One byte is enough: the refusal is on the file holding nothing, not on
-    /// its contents being too short to be real meta. `keccak256(hex"00")` is a
-    /// different value from `keccak256("")`, so the constant still names the
-    /// file it came from.
-    function testDescribedByMetaHashConstantStringAcceptsAnyNonEmptyMeta() external {
+    /// Contents of any length at all are hashed as they are. A one byte file
+    /// gives `keccak256(hex"00")`, a different value from the `keccak256("")`
+    /// of the empty file above, so length is not something this function
+    /// inspects: there is no minimum, no padding, and no check that the bytes
+    /// are meta at all.
+    function testDescribedByMetaHashConstantStringHashesAnyLength() external {
         bytes memory meta = hex"00";
-        vm.writeFileBinary(fixturePath("AcceptsAnyNonEmpty"), meta);
-        string memory emitted = LibCodeGen.describedByMetaHashConstantString(vm, fixtureName("AcceptsAnyNonEmpty"));
-        vm.removeFile(fixturePath("AcceptsAnyNonEmpty"));
+        vm.writeFileBinary(fixturePath("AnyLength"), meta);
+        string memory emitted = LibCodeGen.describedByMetaHashConstantString(vm, fixtureName("AnyLength"));
+        vm.removeFile(fixturePath("AnyLength"));
 
         assertEq(emitted, string.concat(DESCRIBED_BY_META_HASH_PREFIX, vm.toString(keccak256(meta)), ");\n"));
     }

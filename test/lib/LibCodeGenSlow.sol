@@ -23,6 +23,16 @@ string constant SLOW_HEAD_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop
 /// alphabet and the decimal digits.
 string constant SLOW_TAIL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$0123456789";
 
+/// @dev The lowercase hex digits, indexed by the nibble each one spells.
+string constant SLOW_HEX_ALPHABET = "0123456789abcdef";
+
+/// Thrown when a slice is asked for between delimiters that the text does not
+/// carry in that order.
+/// @param text The text that was searched.
+/// @param open The delimiter the slice starts after.
+/// @param close The delimiter the slice ends before.
+error NoSlice(string text, string open, string close);
+
 /// @title LibCodeGenSlow
 /// @notice A deliberately naive reference for the constant declarations
 /// `LibCodeGen` emits.
@@ -34,11 +44,10 @@ string constant SLOW_TAIL_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnop
 /// than imported, so a change to a literal in `LibCodeGen` shows up as a
 /// disagreement instead of moving both sides at once.
 ///
-/// The empty comment case is the one place the two sides state the same rule
-/// rather than deriving it independently: a declaration is preceded by one
-/// blank line, and by a comment line only when there is a comment. The exact
-/// text of both cases is pinned separately by literal assertions, so this
-/// reference is not the only thing holding it.
+/// The lines that precede a declaration are assembled here from the rule they
+/// follow: one blank line always, and a comment line only when there is a
+/// comment. The exact text of both cases is pinned separately by literal
+/// assertions, so this reference is not the only thing holding it.
 library LibCodeGenSlow {
     /// `vm.toString` on a `bytes` always prefixes `0x`, which a `hex"..."`
     /// literal must not carry. Dropped by copying the tail one byte at a time so
@@ -63,13 +72,31 @@ library LibCodeGenSlow {
         return oneLine;
     }
 
+    /// The lines that precede a declaration, listed out and then joined one
+    /// newline terminated line at a time: a blank line always, and a comment
+    /// line only when there is a comment. `LibCodeGen.commentPrefix` instead
+    /// chooses between two whole prefix literals, so the two agree only when
+    /// both the number of lines and the text of each one is right.
+    function commentPrefixSlow(string memory comment) internal pure returns (string memory) {
+        string[] memory lines = new string[](bytes(comment).length == 0 ? 1 : 2);
+        lines[0] = "";
+        if (lines.length == 2) {
+            lines[1] = comment;
+        }
+        string memory prefix = "";
+        for (uint256 i = 0; i < lines.length; i++) {
+            prefix = string.concat(prefix, lines[i], "\n");
+        }
+        return prefix;
+    }
+
     function bytesConstantStringSlow(Vm vm, string memory comment, string memory name, bytes memory data)
         internal
         pure
         returns (string memory)
     {
         return string.concat(
-            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
+            commentPrefixSlow(comment),
             joinSlow(string.concat("bytes constant ", name, " ="), string.concat("hex\"", hexOfSlow(vm, data), "\";")),
             "\n"
         );
@@ -81,7 +108,7 @@ library LibCodeGenSlow {
         returns (string memory)
     {
         return string.concat(
-            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
+            commentPrefixSlow(comment),
             joinSlow(string.concat("uint8 constant ", name, " ="), string.concat(vm.toString(uint256(data)), ";")),
             "\n"
         );
@@ -93,7 +120,7 @@ library LibCodeGenSlow {
         returns (string memory)
     {
         return string.concat(
-            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
+            commentPrefixSlow(comment),
             joinSlow(
                 string.concat("bytes32 constant ", name, " ="), string.concat("bytes32(", vm.toString(data), ");")
             ),
@@ -107,12 +134,87 @@ library LibCodeGenSlow {
         returns (string memory)
     {
         return string.concat(
-            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
+            commentPrefixSlow(comment),
             joinSlow(
                 string.concat("address constant ", name, " ="), string.concat("address(", vm.toString(data), ");")
             ),
             "\n"
         );
+    }
+
+    /// The EIP-55 checksummed hex string for `data`: `0x`, then the forty
+    /// lowercase hex digits of the address, each letter uppercased when the
+    /// nibble at the same position of the keccak256 hash of those forty digits
+    /// is 8 or more. The digits come from the address's own bits rather than
+    /// from `vm.toString`, so this disagrees with the cheatcode instead of
+    /// restating it.
+    function checksumAddressSlow(address data) internal pure returns (string memory) {
+        bytes memory alphabet = bytes(SLOW_HEX_ALPHABET);
+        bytes memory lower = new bytes(40);
+        for (uint256 i = 0; i < 40; i++) {
+            lower[39 - i] = alphabet[(uint256(uint160(data)) >> (4 * i)) & 0x0F];
+        }
+
+        bytes32 hash = keccak256(lower);
+        bytes memory checksummed = new bytes(42);
+        checksummed[0] = "0";
+        checksummed[1] = "x";
+        for (uint256 i = 0; i < 40; i++) {
+            bytes1 digit = lower[i];
+            uint8 nibble = i % 2 == 0 ? uint8(hash[i / 2]) >> 4 : uint8(hash[i / 2]) & 0x0F;
+            checksummed[i + 2] = digit > "9" && nibble > 7 ? bytes1(uint8(digit) - 32) : digit;
+        }
+        return string(checksummed);
+    }
+
+    /// The index of the first `needle` in `haystack` at or after `from`, or
+    /// `haystack.length` when there is none.
+    function indexOfSlow(bytes memory haystack, bytes memory needle, uint256 from) internal pure returns (uint256) {
+        for (uint256 i = from; i + needle.length <= haystack.length; i++) {
+            bool matched = true;
+            for (uint256 j = 0; j < needle.length; j++) {
+                if (haystack[i + j] != needle[j]) {
+                    matched = false;
+                    break;
+                }
+            }
+            if (matched) {
+                return i;
+            }
+        }
+        return haystack.length;
+    }
+
+    /// The text between the first `open` in `text` and the first `close` after
+    /// it, so a test can state a property of the literal a declaration carries
+    /// rather than of a value the test formatted for itself. Reverts when
+    /// either delimiter is missing, so text that does not carry the literal at
+    /// all fails rather than yielding an empty slice.
+    function betweenSlow(string memory text, string memory open, string memory close)
+        internal
+        pure
+        returns (string memory)
+    {
+        bytes memory textBytes = bytes(text);
+        bytes memory openBytes = bytes(open);
+        bytes memory closeBytes = bytes(close);
+
+        uint256 openIndex = indexOfSlow(textBytes, openBytes, 0);
+        if (openIndex == textBytes.length) {
+            revert NoSlice(text, open, close);
+        }
+
+        uint256 start = openIndex + openBytes.length;
+        uint256 end = indexOfSlow(textBytes, closeBytes, start);
+        if (end == textBytes.length) {
+            revert NoSlice(text, open, close);
+        }
+
+        bytes memory slice = new bytes(end - start);
+        for (uint256 i = 0; i < slice.length; i++) {
+            slice[i] = textBytes[start + i];
+        }
+        return string(slice);
     }
 
     /// The length of the longest line in `text`, so a test can assert what

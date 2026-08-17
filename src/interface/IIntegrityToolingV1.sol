@@ -3,7 +3,7 @@
 pragma solidity ^0.8.25;
 
 /// @title IIntegrityToolingV1
-/// Implemented by any contract that exposes integrity check functions for the
+/// @notice Implemented by any contract that exposes integrity check functions for the
 /// Rain interpreter. Ostensibly this is for the interpreter itself and also
 /// extension points such as externs. These integrity checks are for the opcodes
 /// tooled by IOpcodeToolingV1 implementations.

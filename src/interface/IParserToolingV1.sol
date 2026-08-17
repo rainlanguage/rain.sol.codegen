@@ -3,7 +3,7 @@
 pragma solidity ^0.8.25;
 
 /// @title IParserToolingV1
-/// Implemented by any contract that exposes parser tooling functions for the
+/// @notice Implemented by any contract that exposes parser tooling functions for the
 /// Rain interpreter. Ostensibly this is for the interpreter itself while sub
 /// parsers have a separate interface.
 interface IParserToolingV1 {

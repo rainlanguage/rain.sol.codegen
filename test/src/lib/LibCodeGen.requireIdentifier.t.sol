@@ -32,6 +32,20 @@ contract LibCodeGenRequireIdentifierTest is Test {
         this.callRequireIdentifier(name);
     }
 
+    /// Asserts that no byte of `alphabet` means anything to a filesystem. The
+    /// length assertion is what an emptied alphabet fails on, so the loop
+    /// running zero times is not a pass.
+    function assertNoFilesystemBytes(string memory alphabet) internal pure {
+        bytes memory alphabetBytes = bytes(alphabet);
+        assertGt(alphabetBytes.length, 0, "empty alphabet");
+        for (uint256 i = 0; i < alphabetBytes.length; i++) {
+            assertNotEq(uint8(alphabetBytes[i]), uint8(bytes1("/")), "separator in the alphabet");
+            assertNotEq(uint8(alphabetBytes[i]), uint8(bytes1("\\")), "backslash in the alphabet");
+            assertNotEq(uint8(alphabetBytes[i]), uint8(bytes1(".")), "dot in the alphabet");
+            assertNotEq(uint8(alphabetBytes[i]), uint8(bytes1(hex"00")), "nul in the alphabet");
+        }
+    }
+
     /// The names real consumers pass. Every `script/Build.sol` in the Rain org
     /// passes the concrete contract's own name, so these are the shape that must
     /// keep working.
@@ -123,47 +137,35 @@ contract LibCodeGenRequireIdentifierTest is Test {
         assertRejected(string(hex"466f6f00"));
     }
 
-    /// Accepting a name is exactly accepting every one of its bytes, so an
-    /// accepted name can be rebuilt from the identifier alphabet and nothing
-    /// else. Fuzzed so that the check is not merely rejecting the handful of
-    /// bad names spelled out above.
+    /// Accepting a name is exactly accepting every one of its bytes, so
+    /// acceptance agrees with the reference alphabet, which is spelled out
+    /// character by character rather than restating the range arithmetic the
+    /// library decides with. The name is generated as a `string` rather than as
+    /// `bytes`, which is all that separates this from
+    /// `testRequireIdentifierMatchesAlphabet`: uniform bytes are an identifier
+    /// only by accident, and the `string` generator lands on one several times
+    /// more often, so it is this test that carries the accepted half of the
+    /// domain.
     function testRequireIdentifierAcceptedNamesAreIdentifiers(string memory name) external {
-        bytes memory nameBytes = bytes(name);
-        bool expectedValid = nameBytes.length > 0;
-        for (uint256 i = 0; i < nameBytes.length; i++) {
-            bytes1 char = nameBytes[i];
-            bool isLetter = (char >= "A" && char <= "Z") || (char >= "a" && char <= "z");
-            bool isDigit = char >= "0" && char <= "9";
-            bool isUnderscoreOrDollar = char == "_" || char == "$";
-            if (!(isLetter || isUnderscoreOrDollar || (isDigit && i > 0))) {
-                expectedValid = false;
-                break;
-            }
-        }
-
-        if (expectedValid) {
-            this.callRequireIdentifier(name);
+        if (LibCodeGenSlow.isIdentifierSlow(name)) {
+            assertAccepted(name);
         } else {
-            vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, name));
-            this.callRequireIdentifier(name);
+            assertRejected(name);
         }
     }
 
-    /// No accepted name contains a byte that means anything to a filesystem, so
-    /// no accepted name can leave the directory it is interpolated into. Stated
-    /// as a property of the accepted set rather than as a list of the sequences
-    /// that would escape.
-    function testRequireIdentifierAcceptedNamesCannotTraverse(string memory name) external {
-        try this.callRequireIdentifier(name) {
-            bytes memory nameBytes = bytes(name);
-            assertGt(nameBytes.length, 0, "empty name accepted");
-            for (uint256 i = 0; i < nameBytes.length; i++) {
-                assertNotEq(uint8(nameBytes[i]), uint8(bytes1("/")), "separator accepted");
-                assertNotEq(uint8(nameBytes[i]), uint8(bytes1("\\")), "backslash accepted");
-                assertNotEq(uint8(nameBytes[i]), uint8(bytes1(".")), "dot accepted");
-                assertNotEq(uint8(nameBytes[i]), uint8(bytes1(hex"00")), "nul accepted");
-            }
-        } catch {}
+    /// Neither identifier alphabet contains a byte that means anything to a
+    /// filesystem, so no accepted name can leave the directory it is
+    /// interpolated into. Stated over the alphabets rather than over names the
+    /// fuzzer happens to get accepted, so every run of the property carries the
+    /// whole of it. `testRequireIdentifierMatchesAlphabet` is the other half:
+    /// it pins an accepted name to the head alphabet at its first byte and the
+    /// tail alphabet at every later one, and together the two cover the entire
+    /// accepted set. Both alphabets are checked because a name draws from both
+    /// and nothing states that one contains the other.
+    function testRequireIdentifierAlphabetCannotTraverse() external pure {
+        assertNoFilesystemBytes(SLOW_HEAD_ALPHABET);
+        assertNoFilesystemBytes(SLOW_TAIL_ALPHABET);
     }
 
     /// Exhaustive over the leading byte: all 256 of them, accepted exactly when

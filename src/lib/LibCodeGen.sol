@@ -147,7 +147,7 @@ library LibCodeGen {
     /// function pointers constant.
     function literalParserFunctionPointersConstantString(Vm vm, IParserToolingV1 instance)
         internal
-        pure
+        view
         returns (string memory)
     {
         return bytesConstantString(
@@ -173,7 +173,7 @@ library LibCodeGen {
     /// function pointers constant.
     function operandHandlerFunctionPointersConstantString(Vm vm, IParserToolingV1 instance)
         internal
-        pure
+        view
         returns (string memory)
     {
         return bytesConstantString(
@@ -197,7 +197,7 @@ library LibCodeGen {
     /// parsers constant.
     function subParserWordParsersConstantString(Vm vm, ISubParserToolingV1 subParser)
         internal
-        pure
+        view
         returns (string memory)
     {
         return bytesConstantString(

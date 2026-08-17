@@ -166,8 +166,11 @@ contract LibFsPathForTaggedContractTest is Test {
     /// `GENERATED_DIR`. Each argument is either arbitrary bytes or built from its
     /// alphabet, chosen by the fuzzer, so the rejected domain is reached by the
     /// raw branches and the accepted domain — which arbitrary bytes essentially
-    /// never reach — by the constructed ones. Nothing is assumed away: a pair
-    /// that reverts proves confinement by producing no path at all.
+    /// never reach — by the constructed ones. Nothing is assumed away: every
+    /// pair reaches an assertion, because which side of the domain it is on is
+    /// decided by the oracles rather than by whether the call reverted. A pair
+    /// both oracles accept must produce a confined path, and a revert is a
+    /// claim that at least one of them rejects it.
     function testPathForTaggedContractAcceptedArgumentsAreConfined(
         bytes memory tagSeed,
         bytes memory nameSeed,
@@ -180,13 +183,22 @@ contract LibFsPathForTaggedContractTest is Test {
             assertTrue(LibCodeGenSlow.isTagSlow(tag), "a tag outside the alphabet was accepted");
             assertTrue(LibCodeGenSlow.isIdentifierSlow(contractName), "a name outside the alphabet was accepted");
             assertConfined(path);
-        } catch {}
+        } catch {
+            assertFalse(
+                LibCodeGenSlow.isTagSlow(tag) && LibCodeGenSlow.isIdentifierSlow(contractName),
+                "a pair both oracles accept produced no path"
+            );
+        }
     }
 
-    /// The same confinement, stated over a pair that is an accepted tag and an
-    /// accepted name with one byte of one of them replaced by an arbitrary one.
-    /// This is the neighbourhood of the accepted domain, which uniform fuzzing
-    /// never reaches, and it is where an off by one in either check would show.
+    /// The same confinement and the same agreement with the oracles, stated over
+    /// a pair that is an accepted tag and an accepted name with one byte of one
+    /// of them replaced by an arbitrary one. This is the neighbourhood of the
+    /// accepted domain, which uniform fuzzing never reaches, and it is where an
+    /// off by one in either check shows: such a byte is admitted or refused by
+    /// the library against an oracle that spells its alphabet out, so a range
+    /// that opens or closes one too far disagrees here rather than producing a
+    /// path that still happens to be confined.
     function testPathForTaggedContractOneBadByteIsConfined(
         bytes memory tagSeed,
         bytes memory nameSeed,
@@ -201,9 +213,18 @@ contract LibFsPathForTaggedContractTest is Test {
         } else {
             nameBytes[position % nameBytes.length] = bytes1(badByte);
         }
-        try iExternal.pathForTaggedContract(string(tagBytes), string(nameBytes)) returns (string memory path) {
+        string memory tag = string(tagBytes);
+        string memory contractName = string(nameBytes);
+        try iExternal.pathForTaggedContract(tag, contractName) returns (string memory path) {
+            assertTrue(LibCodeGenSlow.isTagSlow(tag), "a tag outside the alphabet was accepted");
+            assertTrue(LibCodeGenSlow.isIdentifierSlow(contractName), "a name outside the alphabet was accepted");
             assertConfined(path);
-        } catch {}
+        } catch {
+            assertFalse(
+                LibCodeGenSlow.isTagSlow(tag) && LibCodeGenSlow.isIdentifierSlow(contractName),
+                "a pair both oracles accept produced no path"
+            );
+        }
     }
 
     /// No path is produced for the tag at all, and the error names the tag

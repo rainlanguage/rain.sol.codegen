@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
-import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, MAX_LINE_LENGTH, InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @title LibCodeGenUint8ConstantStringTest
@@ -14,6 +14,16 @@ import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 /// that measures the line instead, and pin the decision either side of the
 /// maximum.
 contract LibCodeGenUint8ConstantStringTest is Test {
+    /// Reachable only through an external call so that a rejected name reverts
+    /// the call rather than aborting the test.
+    function callUint8ConstantString(string memory comment, string memory name, uint8 data)
+        external
+        pure
+        returns (string memory)
+    {
+        return LibCodeGen.uint8ConstantString(vm, comment, name, data);
+    }
+
     /// The short case: blank line, comment, then the whole declaration on one
     /// line, decimal rather than hex.
     function testUint8ConstantString() external pure {
@@ -77,15 +87,46 @@ contract LibCodeGenUint8ConstantStringTest is Test {
 
     /// Whatever the comment, name and value, the emitted text is the declaration
     /// built from those literals, wrapped exactly when measuring the one line
-    /// form says it does not fit.
-    function testUint8ConstantStringMatchesMeasuredLine(string memory comment, string memory name, uint8 data)
+    /// form says it does not fit. The name is built from the seed rather than
+    /// fuzzed directly because random bytes are essentially never an identifier,
+    /// and a name that is not one is rejected before anything is emitted at all.
+    function testUint8ConstantStringMatchesMeasuredLine(string memory comment, bytes memory seed, uint8 data)
         external
         pure
     {
+        string memory name = LibCodeGenSlow.nameFromSeedSlow(seed);
         assertEq(
             LibCodeGen.uint8ConstantString(vm, comment, name, data),
             LibCodeGenSlow.uint8ConstantStringSlow(vm, comment, name, data)
         );
+    }
+
+    /// The name is interpolated verbatim into a `uint8 constant` declaration, so
+    /// a name that is not a Solidity identifier is refused rather than emitted.
+    /// A space or a `-` produces a file that does not compile, and a `;` one
+    /// that compiles into a different set of declarations than the caller asked
+    /// for.
+    function testUint8ConstantStringRejectsNonIdentifierName() external {
+        string[5] memory names = ["SOME NAME", "SOME;NAME", "SOME-NAME", "", "0LEADING"];
+        for (uint256 i = 0; i < names.length; i++) {
+            vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, names[i]));
+            this.callUint8ConstantString("/// @dev Bad name.", names[i], 42);
+        }
+    }
+
+    /// The set of names that emit is exactly the set of Solidity identifiers.
+    /// Stated against the reference alphabet so that neither a check that
+    /// rejects too much nor one that rejects nothing at all passes.
+    function testUint8ConstantStringNameMustBeIdentifier(string memory name, uint8 data) external {
+        if (LibCodeGenSlow.isIdentifierSlow(name)) {
+            assertEq(
+                this.callUint8ConstantString("/// @dev Fuzz.", name, data),
+                LibCodeGenSlow.uint8ConstantStringSlow(vm, "/// @dev Fuzz.", name, data)
+            );
+        } else {
+            vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, name));
+            this.callUint8ConstantString("/// @dev Fuzz.", name, data);
+        }
     }
 
     /// The literal the declaration carries parses back to the value it was

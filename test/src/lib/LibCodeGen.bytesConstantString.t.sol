@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
-import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, MAX_LINE_LENGTH, InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @dev 32 bytes, so the hex literal is 64 characters and the whole declaration
@@ -27,6 +27,16 @@ string constant HEX_34 = "2573004ac3a9ee7fc8d73654d76386f1b6b99e34cdf86a689c4691
 /// that measures the line instead, and pin the decision either side of the
 /// maximum.
 contract LibCodeGenBytesConstantStringTest is Test {
+    /// Reachable only through an external call so that a rejected name reverts
+    /// the call rather than aborting the test.
+    function callBytesConstantString(string memory comment, string memory name, bytes memory data)
+        external
+        pure
+        returns (string memory)
+    {
+        return LibCodeGen.bytesConstantString(vm, comment, name, data);
+    }
+
     /// The short case: blank line, comment, then the whole declaration on one
     /// line. The blank line is what separates this constant from whatever the
     /// caller concatenated before it.
@@ -85,15 +95,47 @@ contract LibCodeGenBytesConstantStringTest is Test {
     /// Whatever the comment, name and data, the emitted text is the declaration
     /// built from those literals, wrapped exactly when measuring the one line
     /// form says it does not fit. Fuzzed over every input because each term of
-    /// the library's hand computed sum has to be right for this to hold.
-    function testBytesConstantStringMatchesMeasuredLine(string memory comment, string memory name, bytes memory data)
+    /// the library's hand computed sum has to be right for this to hold. The
+    /// name is built from the seed rather than fuzzed directly because random
+    /// bytes are essentially never an identifier, and a name that is not one is
+    /// rejected before anything is emitted at all.
+    function testBytesConstantStringMatchesMeasuredLine(string memory comment, bytes memory seed, bytes memory data)
         external
         pure
     {
+        string memory name = LibCodeGenSlow.nameFromSeedSlow(seed);
         assertEq(
             LibCodeGen.bytesConstantString(vm, comment, name, data),
             LibCodeGenSlow.bytesConstantStringSlow(vm, comment, name, data)
         );
+    }
+
+    /// The name is interpolated verbatim into a `bytes constant` declaration, so
+    /// a name that is not a Solidity identifier is refused rather than emitted.
+    /// A space or a `-` produces a file that does not compile, and a `;` one
+    /// that compiles into a different set of declarations than the caller asked
+    /// for.
+    function testBytesConstantStringRejectsNonIdentifierName() external {
+        string[5] memory names = ["SOME NAME", "SOME;NAME", "SOME-NAME", "", "0LEADING"];
+        for (uint256 i = 0; i < names.length; i++) {
+            vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, names[i]));
+            this.callBytesConstantString("/// @dev Bad name.", names[i], hex"12345678");
+        }
+    }
+
+    /// The set of names that emit is exactly the set of Solidity identifiers.
+    /// Stated against the reference alphabet so that neither a check that
+    /// rejects too much nor one that rejects nothing at all passes.
+    function testBytesConstantStringNameMustBeIdentifier(string memory name, bytes memory data) external {
+        if (LibCodeGenSlow.isIdentifierSlow(name)) {
+            assertEq(
+                this.callBytesConstantString("/// @dev Fuzz.", name, data),
+                LibCodeGenSlow.bytesConstantStringSlow(vm, "/// @dev Fuzz.", name, data)
+            );
+        } else {
+            vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, name));
+            this.callBytesConstantString("/// @dev Fuzz.", name, data);
+        }
     }
 
     /// The hex the declaration carries is the data, unchanged and unprefixed, so

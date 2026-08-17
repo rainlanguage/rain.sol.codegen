@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibFs, GENERATED_DIR, InvalidTag} from "src/lib/LibFs.sol";
-import {InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
@@ -41,7 +41,7 @@ contract LibFsPathForTaggedContractTest is Test {
     /// carries its own separator is still refused, so a caller cannot reach the
     /// tagged layout by smuggling the tag through `pathForContract`.
     function testPathForContractStillRefusesASmuggledTag() external {
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, "0_1_1/StoxReceipt"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, "0_1_1/StoxReceipt"));
         iExternal.pathForContract("0_1_1/StoxReceipt");
     }
 
@@ -178,7 +178,7 @@ contract LibFsPathForTaggedContractTest is Test {
         string memory contractName = rawName ? string(nameSeed) : LibCodeGenSlow.nameFromSeedSlow(nameSeed);
         try iExternal.pathForTaggedContract(tag, contractName) returns (string memory path) {
             assertTrue(LibCodeGenSlow.isTagSlow(tag), "a tag outside the alphabet was accepted");
-            assertTrue(LibCodeGenSlow.isContractNameSlow(contractName), "a name outside the alphabet was accepted");
+            assertTrue(LibCodeGenSlow.isIdentifierSlow(contractName), "a name outside the alphabet was accepted");
             assertConfined(path);
         } catch {}
     }
@@ -217,7 +217,7 @@ contract LibFsPathForTaggedContractTest is Test {
     /// No path is produced for the contract name at all, and the error names the
     /// contract name.
     function assertNameRejected(string memory tag, string memory contractName) internal {
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, contractName));
+        vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, contractName));
         iExternal.pathForTaggedContract(tag, contractName);
     }
 
@@ -286,7 +286,7 @@ contract LibFsPathForTaggedContractTest is Test {
     /// The whole rejected name domain, not only the names above.
     function testPathForTaggedContractRejectsEveryNonIdentifierName(bytes memory nameBytes) external {
         string memory contractName = string(nameBytes);
-        vm.assume(!LibCodeGenSlow.isContractNameSlow(contractName));
+        vm.assume(!LibCodeGenSlow.isIdentifierSlow(contractName));
         assertNameRejected("0_1_1", contractName);
     }
 }

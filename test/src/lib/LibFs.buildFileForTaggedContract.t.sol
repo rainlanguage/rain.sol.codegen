@@ -4,10 +4,20 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibFs, GENERATED_DIR, InvalidTag} from "src/lib/LibFs.sol";
-import {InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
+
+/// @dev The licence identifier this repo declares for its own source. Which
+/// values a caller passes is incidental to every test here, which are about the
+/// tag and the path rather than the header, so these are this repo's own rather
+/// than invented.
+string constant SPDX_LICENSE_IDENTIFIER = "LicenseRef-DCL-1.0";
+
+/// @dev The copyright text this repo declares for its own source, for the same
+/// reason.
+string constant COPYRIGHT_TEXT = "Copyright (c) 2020 Rain Open Source Software Ltd";
 
 /// @title LibFsBuildFileForTaggedContractTest
 /// @notice `buildFileForTaggedContract` writes the per tag deploy pin snapshots
@@ -76,7 +86,9 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         address instance = address(new CodeGennable());
         string memory body = "\n/// @dev Body.\nuint256 constant BODY = 1;\n";
 
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedExact", body);
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedExact", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body
+        );
 
         assertEq(vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedExact")), expectedFile(instance, body));
         cleanup(tag);
@@ -91,7 +103,9 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         assertFalse(vm.exists("src/generated/0_1_1$taggedPath/LibFsTaggedPath.sol"), "dirty precondition");
         address instance = address(new CodeGennable());
 
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedPath", "\n// body\n");
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedPath", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, "\n// body\n"
+        );
 
         assertEq(
             LibFs.pathForTaggedContract(tag, "LibFsTaggedPath"),
@@ -113,7 +127,9 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         address instance = address(new CodeGennable());
         string memory body = "\n// fresh dir\n";
 
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedFreshDir", body);
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedFreshDir", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body
+        );
 
         assertTrue(vm.isDir(LibFs.dirForTag(tag)), "tag directory was not created");
         assertEq(vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedFreshDir")), expectedFile(instance, body));
@@ -130,7 +146,9 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         address instance = address(new CodeGennable());
         string memory body = "\n// existing dir\n";
 
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedExistingDir", body);
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedExistingDir", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body
+        );
 
         assertEq(
             vm.readFile(string.concat(LibFs.dirForTag(tag), "/bystander.txt")),
@@ -159,7 +177,9 @@ contract LibFsBuildFileForTaggedContractTest is Test {
 
         address instance = address(new CodeGennable());
         string memory body = "\n// replaced\n";
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedOverwrite", body);
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedOverwrite", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body
+        );
 
         assertEq(vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedOverwrite")), expectedFile(instance, body));
         cleanup(tag);
@@ -173,9 +193,13 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         address instance = address(new CodeGennable());
         string memory body = "\n// idempotent\n";
 
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedIdempotent", body);
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedIdempotent", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body
+        );
         string memory first = vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedIdempotent"));
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedIdempotent", body);
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedIdempotent", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body
+        );
         string memory second = vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedIdempotent"));
 
         assertEq(first, second, "second run differs from the first");
@@ -191,7 +215,9 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         cleanup(tag);
         address instance = address(new CodeGennable());
 
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedEmptyBody", "");
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedEmptyBody", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, ""
+        );
 
         assertEq(vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedEmptyBody")), expectedFile(instance, ""));
         cleanup(tag);
@@ -205,7 +231,9 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         address instance = address(new CodeGennable());
         string memory body = "string constant S = \"a\\\"b\";\n";
 
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedVerbatim", body);
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedVerbatim", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body
+        );
 
         string memory written = vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedVerbatim"));
         assertEq(written, expectedFile(instance, body));
@@ -228,10 +256,14 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         assertNotEq(frozenInstance.codehash, rollingInstance.codehash, "instances must hold different code");
         string memory frozenBody = "\n// frozen\n";
 
-        LibFs.buildFileForTaggedContract(vm, frozenInstance, frozen, "LibFsTaggedShared", frozenBody);
+        LibFs.buildFileForTaggedContract(
+            vm, frozenInstance, frozen, "LibFsTaggedShared", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, frozenBody
+        );
         string memory frozenFile = vm.readFile(LibFs.pathForTaggedContract(frozen, "LibFsTaggedShared"));
 
-        LibFs.buildFileForTaggedContract(vm, rollingInstance, rolling, "LibFsTaggedShared", "\n// rolling\n");
+        LibFs.buildFileForTaggedContract(
+            vm, rollingInstance, rolling, "LibFsTaggedShared", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, "\n// rolling\n"
+        );
 
         assertEq(
             vm.readFile(LibFs.pathForTaggedContract(frozen, "LibFsTaggedShared")),
@@ -257,8 +289,12 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         string memory bodyA = "\n// sibling a\n";
         string memory bodyB = "\n// sibling b\n";
 
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedSiblingA", bodyA);
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedSiblingB", bodyB);
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedSiblingA", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, bodyA
+        );
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedSiblingB", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, bodyB
+        );
 
         assertEq(
             vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedSiblingA")),
@@ -284,7 +320,9 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         string memory untaggedPath = LibFs.pathForContract("LibFsTaggedUntagged");
         vm.writeFile(untaggedPath, "// UNTAGGED\n");
 
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedUntagged", "\n// tagged\n");
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedUntagged", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, "\n// tagged\n"
+        );
 
         assertEq(vm.readFile(untaggedPath), "// UNTAGGED\n", "the untagged file was disturbed");
         vm.removeFile(untaggedPath);
@@ -302,9 +340,13 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         assertTrue(instance.code.length > 0 && other.code.length > 0, "both addresses must hold code");
         assertNotEq(instance.codehash, other.codehash, "addresses must hold different code");
 
-        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedInstance", "");
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedInstance", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, ""
+        );
         string memory fromInstance = vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedInstance"));
-        LibFs.buildFileForTaggedContract(vm, other, tag, "LibFsTaggedInstance", "");
+        LibFs.buildFileForTaggedContract(
+            vm, other, tag, "LibFsTaggedInstance", SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, ""
+        );
         string memory fromOther = vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedInstance"));
 
         assertNotEq(fromInstance, fromOther, "instance is not what the hash is read from");
@@ -331,14 +373,18 @@ contract LibFsBuildFileForTaggedContractTest is Test {
     /// anything is written.
     function assertTagRejected(string memory tag, string memory contractName) internal {
         vm.expectRevert(abi.encodeWithSelector(InvalidTag.selector, tag));
-        iExternal.buildFileForTaggedContract(vm, address(this), tag, contractName, "");
+        iExternal.buildFileForTaggedContract(
+            vm, address(this), tag, contractName, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, ""
+        );
     }
 
     /// A contract name that is not a Solidity identifier is refused the same
     /// way.
     function assertNameRejected(string memory tag, string memory contractName) internal {
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, contractName));
-        iExternal.buildFileForTaggedContract(vm, address(this), tag, contractName, "");
+        vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, contractName));
+        iExternal.buildFileForTaggedContract(
+            vm, address(this), tag, contractName, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, ""
+        );
     }
 
     /// An empty tag would write to `src/generated//Foo.sol`, which resolves to
@@ -391,7 +437,7 @@ contract LibFsBuildFileForTaggedContractTest is Test {
     /// just the ones named above.
     function testBuildFileForTaggedContractRejectsEveryNonIdentifierName(bytes memory nameBytes) external {
         string memory contractName = string(nameBytes);
-        vm.assume(!LibCodeGenSlow.isContractNameSlow(contractName));
+        vm.assume(!LibCodeGenSlow.isIdentifierSlow(contractName));
         assertNameRejected("0_1_1$taggedFuzzName", contractName);
     }
 }

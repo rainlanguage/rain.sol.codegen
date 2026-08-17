@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibFs, InvalidTag} from "src/lib/LibFs.sol";
-import {LibCodeGen, InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {LibCodeGenSlow, SLOW_TAIL_ALPHABET} from "test/lib/LibCodeGenSlow.sol";
 
 /// @title LibFsRequireTagTest
@@ -21,10 +21,10 @@ contract LibFsRequireTagTest is Test {
         LibFs.requireTag(tag);
     }
 
-    /// `requireContractName` behind a call frame too, so the two rules can be
+    /// `requireIdentifier` behind a call frame too, so the two rules can be
     /// asserted to disagree on the same string.
     function callRequireContractName(string memory name) external pure {
-        LibCodeGen.requireContractName(name);
+        LibCodeGen.requireIdentifier(name);
     }
 
     function assertAccepted(string memory tag) internal view {
@@ -50,12 +50,12 @@ contract LibFsRequireTagTest is Test {
     }
 
     /// A tag opening with a digit is the case that separates this rule from
-    /// `requireContractName`, which refuses one because a Solidity identifier
+    /// `requireIdentifier`, which refuses one because a Solidity identifier
     /// cannot open with a digit. Both verdicts on the same string are asserted
     /// here, so collapsing the two rules into one fails.
     function testRequireTagAcceptsLeadingDigitContractNameDoesNot() external {
         assertAccepted("0_1_1");
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, "0_1_1"));
+        vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, "0_1_1"));
         this.callRequireContractName("0_1_1");
     }
 

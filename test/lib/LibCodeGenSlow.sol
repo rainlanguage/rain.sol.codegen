@@ -14,7 +14,7 @@ uint256 constant SLOW_LINE_LENGTH = 120;
 string constant SLOW_WRAP = "\n    ";
 
 /// @dev Every character a Solidity identifier may begin with, spelled out one by
-/// one rather than as byte ranges. `LibCodeGen.requireContractName` decides with
+/// one rather than as byte ranges. `LibCodeGen.requireIdentifier` decides with
 /// range comparisons, so an off by one at either end of a range shows up here as
 /// a disagreement instead of moving both sides at once.
 string constant SLOW_HEAD_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$";
@@ -274,7 +274,7 @@ library LibCodeGenSlow {
 
     /// True if `name` is a Solidity identifier, decided by membership of the
     /// written out alphabets rather than by arithmetic.
-    function isContractNameSlow(string memory name) internal pure returns (bool) {
+    function isIdentifierSlow(string memory name) internal pure returns (bool) {
         bytes memory nameBytes = bytes(name);
         if (nameBytes.length == 0) {
             return false;

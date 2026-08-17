@@ -2,6 +2,7 @@
   {
     "timestamp": "2026-08-16T14:55:16Z",
     "commit": "c72eb89b029c9c7733d4c6deff849cc5da93dd5b",
+    "testsAfterCommit": "ae21818a51d1b8c7df14d8c32eb39521e9c1a146",
     "publishedTag": "sol-v0.1.6",
     "commitsAheadOfTag": 0,
     "scope": "whole repo",
@@ -14,7 +15,7 @@
       "survived": 1,
       "controls": 3,
       "testsBefore": 9,
-      "testsAfter": 102,
+      "testsAfter": 84,
       "filed": ["#38", "#40", "#41", "#42", "#43", "#44", "#45", "#46", "#47", "#48"],
       "coveragePrs": ["#36", "#37", "#39"]
     }

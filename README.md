@@ -12,10 +12,10 @@ Also exposes the tooling interfaces (`IIntegrityToolingV1`, `IOpcodeToolingV1`,
 build the pointers this library caches.
 
 A consumer drives this library from a build script, and the path of that script
-is not a free choice: rainix's `rainix-copy-artifacts.yaml` reusable regenerates
-from `script/Build.sol` exactly, and hard-fails any repo that commits
-`src/generated/` without one. A consumer that names its script anything else
-gets no regeneration and no currency check.
+is not a free choice: it must be `script/Build.sol`, the path org CI regenerates
+and currency-checks committed generated sources from — see
+[`rainix-copy-artifacts.yaml`](https://github.com/rainlanguage/rainix/blob/main/.github/workflows/rainix-copy-artifacts.yaml).
+Any other path is an unsupported layout.
 
 The org's worked example is
 [`rainlanguage/rain.deploy`](https://github.com/rainlanguage/rain.deploy):
@@ -36,10 +36,8 @@ where neither pointer values nor the codehash of any consuming contract shift.
 of `foundry.toml` rather than inheriting.
 
 A consuming repo whose `[fmt]` disagrees gets generated sources its own
-`forge fmt` reflows. `rainix-copy-artifacts` regenerates, runs `forge fmt`, then
-`git diff --exit-code`, so that reflow is committed as the new baseline instead
-of being reported. Consumers therefore need `line_length = 120` and
-`tab_width = 4`.
+`forge fmt` reflows away from what this library emits. Consumers therefore need
+`line_length = 120` and `tab_width = 4`.
 
 ## Install
 
@@ -73,22 +71,26 @@ file, so a completed run leaves the directory empty and invisible to git. Same
 arrangement as `meta/`, which the meta-hash tests use the same way. Anything
 left there after an interrupted run is scratch, and `git status` will say so.
 
-On top of the above, CI applies rainix's org-wide static checks via
-[`.github/workflows/rainix.yaml`](.github/workflows/rainix.yaml).
+[`.github/workflows/rainix.yaml`](https://github.com/rainlanguage/rain.sol.codegen/blob/main/.github/workflows/rainix.yaml)
+is what runs all four in CI, via rainix's `rainix-sol.yaml`. CI also applies
+org-wide gates that none of the four covers — see
+[`rainix-sol-static.yaml`](https://github.com/rainlanguage/rainix/blob/main/.github/workflows/rainix-sol-static.yaml)
+— so a green local run is necessary but not sufficient.
 
 Use the nix-pinned `forge` for all development.
 
 ## Publish
 
 Publishing is merge-driven, not tag-driven.
-[`Package Release`](.github/workflows/package-release.yaml) calls rainix's
-`rainix-autopublish.yaml` reusable on every push to `main`, passing the package
-name explicitly as `soldeer-package: rain-sol-codegen`. When the source content
-differs from the latest published revision, that workflow pushes
-`[package].version` to Soldeer, tags `sol-v<x.y.z>`, and bumps
-`[package].version` to the next version. `[package].version` in `foundry.toml`
-is therefore the next, unpublished version rather than the last published one.
-Neither the version nor the tag is set by hand.
+[`Package Release`](https://github.com/rainlanguage/rain.sol.codegen/blob/main/.github/workflows/package-release.yaml)
+calls rainix's
+[`rainix-autopublish.yaml`](https://github.com/rainlanguage/rainix/blob/main/.github/workflows/rainix-autopublish.yaml)
+reusable on every push to `main`, passing the package name explicitly as
+`soldeer-package: rain-sol-codegen`.
+
+That workflow owns both the version and the release tag, so neither is set by
+hand. `[package].version` in `foundry.toml` is therefore the next, unpublished
+version rather than the last published one.
 
 ## License
 

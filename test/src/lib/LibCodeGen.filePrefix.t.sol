@@ -7,19 +7,16 @@ import {LibCodeGen} from "src/lib/LibCodeGen.sol";
 
 /// @title LibCodeGenFilePrefixTest
 contract LibCodeGenFilePrefixTest is Test {
-    /// The prefix must not name the script that generates the file. Each
-    /// consumer names its own build script, so any script path here is a claim
-    /// this library cannot keep. Asserted as "names no Solidity file at all"
-    /// because the constraint is that no script is named, not that some
-    /// particular name is absent.
-    function testFilePrefixNamesNoScript() external pure {
-        assertFalse(vm.contains(LibCodeGen.filePrefix(), ".sol"), "prefix names a script");
-    }
-
     /// The prefix heads every generated file in every consumer repo, so a
     /// change here rewrites committed files org wide. Pinned exactly so that
     /// lands as a deliberate, reviewable diff rather than a surprise on the
     /// next regeneration.
+    ///
+    /// The pinned text names no script. Each consumer names its own build
+    /// script, so a script path in the prefix would be a claim this library
+    /// cannot keep. Exactly one string passes here, so every string that
+    /// names a `.sol` file fails, and pinning the whole prefix is what
+    /// refuses them.
     function testFilePrefixExact() external pure {
         //REUSE-IgnoreStart
         assertEq(

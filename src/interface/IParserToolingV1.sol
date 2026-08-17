@@ -21,6 +21,8 @@ interface IParserToolingV1 {
     /// Declared `view` so an implementation may read storage or an immutable to
     /// build its answer. A `pure` implementation still conforms, as an override
     /// may only tighten mutability.
+    /// @return Every two bytes is a function pointer for an operand handler,
+    /// positionally indexed to match the parse meta.
     function buildOperandHandlerFunctionPointers() external view returns (bytes memory);
 
     /// Builds literal parser function pointers.
@@ -37,5 +39,7 @@ interface IParserToolingV1 {
     /// Declared `view` so an implementation may read storage or an immutable to
     /// build its answer. A `pure` implementation still conforms, as an override
     /// may only tighten mutability.
+    /// @return Every two bytes is a function pointer for a literal parser,
+    /// dispatched on the first byte(s) of the literal.
     function buildLiteralParserFunctionPointers() external view returns (bytes memory);
 }

@@ -1,19 +1,27 @@
 # rain.sol.codegen
 
 Solidity-native tooling to generate Solidity source. Builds a valid `.sol` file
-(pragma + foundry-clean formatting) that hosts the constant caches for prebuilt
-function-pointer tables — needed for runtime gas efficiency in the Rain
-interpreter.
+(pragma + foundry-clean formatting) hosting build-time constants that a contract
+imports and the compiler inlines: prebuilt function-pointer tables (the case
+that motivates it — runtime gas efficiency in the Rain interpreter), a
+deployed-bytecode hash, a described-by meta hash, and plain
+`address`/`uint8`/`bytes32`/`bytes` constants.
 
 Also exposes the tooling interfaces (`IIntegrityToolingV1`, `IOpcodeToolingV1`,
 `IParserToolingV1`, `ISubParserToolingV1`) that Rain contracts implement to
 build the pointers this library caches.
 
-`script/Build.sol` is an example implementation. The name is not a free choice:
-rainix's `rainix-copy-artifacts.yaml` reusable regenerates from that exact path,
-and hard-fails any repo that commits `src/generated/` without it.
-`.github/workflows/build-pointers.yaml` wires that reusable up here, so CI fails
-when the committed generated sources drift from a fresh regeneration.
+A consumer drives this library from a build script, and the path of that script
+is not a free choice: rainix's `rainix-copy-artifacts.yaml` reusable regenerates
+from `script/Build.sol` exactly, and hard-fails any repo that commits
+`src/generated/` without one. A consumer that names its script anything else
+gets no regeneration and no currency check.
+
+The org's worked example is
+[`rainlanguage/rain.deploy`](https://github.com/rainlanguage/rain.deploy):
+[`script/Build.sol`](https://github.com/rainlanguage/rain.deploy/blob/main/script/Build.sol)
+generates into its committed `src/generated/`. This repo carries no example of
+its own — it is the library, and nothing here is generated.
 
 Generated code is imported downstream by contracts that themselves expose
 pointers, which pointers feed back into the generation. This cycle means
@@ -59,11 +67,11 @@ Checks, each of which CI also runs:
 - `slither .`
 - `reuse lint`
 
-Regenerate the committed example artifact under `src/generated/`:
-
-```sh
-forge script script/Build.sol
-```
+`forge test` writes scratch files under `src/generated/`, creating the directory
+if it is absent. Nothing there is committed, and every test removes its own
+file, so a completed run leaves the directory empty and invisible to git. Same
+arrangement as `meta/`, which the meta-hash tests use the same way. Anything
+left there after an interrupted run is scratch, and `git status` will say so.
 
 On top of the above, CI applies rainix's org-wide static checks via
 [`.github/workflows/rainix.yaml`](.github/workflows/rainix.yaml).

@@ -28,15 +28,14 @@ pointers, which pointers feed back into the generation. This cycle means
 pointers may need to be regenerated several times until they reach a fixed point
 where neither pointer values nor the codehash of any consuming contract shift.
 
-That loop belongs to the reusable, not to a person running regeneration until
-they guess it has settled. It repeats the whole regeneration until the working
-tree stops changing, up to `max-codegen-passes` (5 by default), and a repo still
-moving when the bound is spent fails with `did not reach a fixed point`. That is
-a different failure from `Committed artifacts are stale`, and takes a different
-fix: the cycle itself does not settle, so regenerating again never produces a
-tree worth committing. Committing whichever pass happens to diff clean is what
-the bound exists to stop — it records a `BYTECODE_HASH` for a contract compiled
-against a different pass of the same file.
+Reaching that fixed point is the consumer's job: nothing bounds or iterates the
+loop. A tree that has not settled fails the currency check exactly as a tree
+nobody regenerated does — see
+[`rainix-copy-artifacts.yaml`](https://github.com/rainlanguage/rainix/blob/main/.github/workflows/rainix-copy-artifacts.yaml)
+— so regenerate until the working tree stops changing before committing, and
+read a tree that never stops changing as a cycle that does not converge rather
+than one more pass to run. Committing part-way records a deployed-bytecode hash
+for a contract compiled against a different pass of the same file.
 
 ## Formatter requirements
 

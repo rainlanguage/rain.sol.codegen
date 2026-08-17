@@ -9,8 +9,15 @@ import {LibFs} from "src/lib/LibFs.sol";
 /// Puts `LibFs` behind a call frame. `vm.expectRevert` needs one, and the
 /// library functions are internal so they are inlined into whatever calls them.
 contract LibFsExternal {
-    function buildFileForContract(Vm vm, address instance, string memory contractName, string memory body) external {
-        LibFs.buildFileForContract(vm, instance, contractName, body);
+    function buildFileForContract(
+        Vm vm,
+        address instance,
+        string memory contractName,
+        string memory spdxLicenseIdentifier,
+        string memory copyrightText,
+        string memory body
+    ) external {
+        LibFs.buildFileForContract(vm, instance, contractName, spdxLicenseIdentifier, copyrightText, body);
     }
 
     function pathForContract(string memory contractName) external pure returns (string memory) {

@@ -160,8 +160,19 @@ contract LibFsIsPresentTest is Test {
         assertFalse(vm.exists(pathFor(linkName)), "the link is not dangling");
 
         string memory body = "\n// dangling\n";
-        LibFs.buildFileForContract(vm, address(this), name, body);
-        LibFs.buildFileForContract(vm, address(this), controlName, body);
+        // The licence and copyright reach the header and nothing here reads the
+        // header, so this repo's own values stand in for a caller's.
+        LibFs.buildFileForContract(
+            vm, address(this), name, "LicenseRef-DCL-1.0", "Copyright (c) 2020 Rain Open Source Software Ltd", body
+        );
+        LibFs.buildFileForContract(
+            vm,
+            address(this),
+            controlName,
+            "LicenseRef-DCL-1.0",
+            "Copyright (c) 2020 Rain Open Source Software Ltd",
+            body
+        );
 
         assertFalse(vm.exists(pathFor(targetName)), "the write followed the link to its target");
         assertTrue(readlink(linkName).exitCode != 0, "the path is still a symlink");
@@ -203,8 +214,19 @@ contract LibFsIsPresentTest is Test {
         assertEq(vm.readFile(pathFor(targetName)), "SENTINEL", "the link target is not the seeded file");
 
         string memory body = "\n// live\n";
-        LibFs.buildFileForContract(vm, address(this), name, body);
-        LibFs.buildFileForContract(vm, address(this), controlName, body);
+        // The licence and copyright reach the header and nothing here reads the
+        // header, so this repo's own values stand in for a caller's.
+        LibFs.buildFileForContract(
+            vm, address(this), name, "LicenseRef-DCL-1.0", "Copyright (c) 2020 Rain Open Source Software Ltd", body
+        );
+        LibFs.buildFileForContract(
+            vm,
+            address(this),
+            controlName,
+            "LicenseRef-DCL-1.0",
+            "Copyright (c) 2020 Rain Open Source Software Ltd",
+            body
+        );
 
         bool linkIsStillASymlink = readlink(linkName).exitCode == 0;
         bool targetExists = vm.exists(pathFor(targetName));

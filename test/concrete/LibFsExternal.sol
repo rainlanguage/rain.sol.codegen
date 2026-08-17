@@ -39,4 +39,32 @@ contract LibFsExternal {
     function requireNoOrphanedArtifact(Vm vm, string memory contractName) external view {
         LibFs.requireNoOrphanedArtifact(vm, contractName);
     }
+
+    function buildFileForTaggedContract(
+        Vm vm,
+        address instance,
+        string memory tag,
+        string memory contractName,
+        string memory spdxLicenseIdentifier,
+        string memory copyrightText,
+        string memory body
+    ) external {
+        LibFs.buildFileForTaggedContract(vm, instance, tag, contractName, spdxLicenseIdentifier, copyrightText, body);
+    }
+
+    function pathForTaggedContract(string memory tag, string memory contractName)
+        external
+        pure
+        returns (string memory)
+    {
+        return LibFs.pathForTaggedContract(tag, contractName);
+    }
+
+    function dirForTag(string memory tag) external pure returns (string memory) {
+        return LibFs.dirForTag(tag);
+    }
+
+    function requireTag(string memory tag) external pure {
+        LibFs.requireTag(tag);
+    }
 }

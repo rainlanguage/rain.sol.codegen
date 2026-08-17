@@ -7,9 +7,10 @@ import {VmSafe} from "forge-std-1.16.2/src/Vm.sol";
 import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 
 /// @title LibFsIsPresentTest
-/// @notice `isPresent` is what stands between `buildFileForContract` and a write
-/// that lands somewhere other than the path it was given, so what it answers for
-/// a symlink is asserted here together with the write that depends on it.
+/// @notice `isPresent` is what stands between the two write functions and a
+/// write that lands somewhere other than the path it was given, so what it
+/// answers for a symlink is asserted here together with both writes that depend
+/// on it.
 ///
 /// Symlinks are built with `ln` because forge-std 1.16.2 has no cheatcode that
 /// creates one, and they are read back with `readlink`, which reports the path
@@ -53,6 +54,17 @@ contract LibFsIsPresentTest is Test {
         command[0] = "readlink";
         command[1] = pathFor(name);
         return vm.tryFfi(command);
+    }
+
+    /// Creates the directory at `name` and every missing parent of it, so a
+    /// symlink can be placed inside a directory that the write also creates.
+    function makeDir(string memory name) internal {
+        string[] memory command = new string[](3);
+        command[0] = "mkdir";
+        command[1] = "-p";
+        command[2] = pathFor(name);
+        VmSafe.FfiResult memory result = vm.tryFfi(command);
+        assertEq(result.exitCode, 0, string(result.stderr));
     }
 
     /// `rm -rf` removes a dangling symlink and succeeds on a path that holds
@@ -185,6 +197,61 @@ contract LibFsIsPresentTest is Test {
         remove(linkName);
         remove(targetName);
         remove(controlFileName);
+    }
+
+    /// The tagged write carries the same guarantee at its own path: a symlink
+    /// with no target inside the tag's directory is replaced by a regular file
+    /// holding the generated content, and the link's target is not created.
+    ///
+    /// The link's target is named relative to the directory the link sits in,
+    /// which is the tag's directory rather than the generated directory, so the
+    /// two names for it differ by that segment.
+    ///
+    /// The content is compared against a second contract generated in the same
+    /// tag at a path that held nothing, so the claim is that the two cases
+    /// produce the same file rather than that some particular bytes appear.
+    function testBuildFileForTaggedContractReplacesDanglingSymlink() external {
+        string memory tag = "0_1_1$isPresentDangling";
+        string memory name = "LibFsIsPresentTaggedDangling";
+        string memory controlName = "LibFsIsPresentTaggedControl";
+        string memory linkName = string.concat(tag, "/", name, ".sol");
+        string memory linkTarget = "LibFsIsPresentTaggedDanglingTarget.txt";
+        string memory targetName = string.concat(tag, "/", linkTarget);
+        string memory controlFileName = string.concat(tag, "/", controlName, ".sol");
+        remove(tag);
+        makeDir(tag);
+
+        symlink(linkName, linkTarget);
+        assertEq(LibFs.pathForTaggedContract(tag, name), pathFor(linkName), "the link is not where the write goes");
+        assertEq(readlink(linkName).exitCode, 0, "the path under test is not a symlink");
+        assertFalse(vm.exists(pathFor(targetName)), "the link target is already there");
+        assertFalse(vm.exists(pathFor(linkName)), "the link is not dangling");
+
+        string memory body = "\n// dangling\n";
+        // The licence and copyright reach the header and nothing here reads the
+        // header, so this repo's own values stand in for a caller's.
+        LibFs.buildFileForTaggedContract(
+            vm, address(this), tag, name, "LicenseRef-DCL-1.0", "Copyright (c) 2020 Rain Open Source Software Ltd", body
+        );
+        LibFs.buildFileForTaggedContract(
+            vm,
+            address(this),
+            tag,
+            controlName,
+            "LicenseRef-DCL-1.0",
+            "Copyright (c) 2020 Rain Open Source Software Ltd",
+            body
+        );
+
+        assertFalse(vm.exists(pathFor(targetName)), "the write followed the link to its target");
+        assertTrue(readlink(linkName).exitCode != 0, "the path is still a symlink");
+        assertEq(
+            vm.readFile(pathFor(linkName)),
+            vm.readFile(pathFor(controlFileName)),
+            "the file at the path is not what a write to a path holding nothing produces"
+        );
+
+        remove(tag);
     }
 
     /// A symlink at the generated path whose target exists is replaced by a

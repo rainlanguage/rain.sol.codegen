@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
-import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
+import {LibCodeGen, MAX_LINE_LENGTH, InvalidIdentifier} from "src/lib/LibCodeGen.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @dev A checksummed address literal, 42 characters like every other, so the
 /// declaration is `72 + name.length` characters long on one line.
@@ -16,6 +16,16 @@ string constant SOME_ADDRESS_STRING = "0xc51a14251b0dcF0ae24A96b7153991378938f5F
 /// declaration. The output is source code that must COMPILE, so these assert the
 /// exact emitted text rather than that it merely contains the address.
 contract LibCodeGenAddressConstantStringTest is Test {
+    /// Reachable only through an external call so that a rejected name reverts
+    /// the call rather than aborting the test.
+    function callAddressConstantString(string memory comment, string memory name, address data)
+        external
+        pure
+        returns (string memory)
+    {
+        return LibCodeGen.addressConstantString(vm, comment, name, data);
+    }
+
     function testAddressConstantString() external view {
         assertEq(
             LibCodeGen.addressConstantString(
@@ -33,14 +43,26 @@ contract LibCodeGenAddressConstantStringTest is Test {
         );
     }
 
-    /// The emitted literal is checksummed, so it round-trips back to the same
-    /// address rather than silently relying on an all-lowercase form.
+    /// The literal the declaration carries parses back to the address it was
+    /// generated from. The literal is sliced out of the emitted text, so the
+    /// round trip is a property of what the library wrote.
     function testAddressConstantStringRoundTrips(address data) external view {
         string memory emitted = LibCodeGen.addressConstantString(vm, "/// @dev Fuzz.", "FUZZ", data);
         assertEq(
             emitted, string.concat("\n/// @dev Fuzz.\naddress constant FUZZ = address(", vm.toString(data), ");\n")
         );
-        assertEq(vm.parseAddress(vm.toString(data)), data);
+        assertEq(vm.parseAddress(LibCodeGenSlow.betweenSlow(emitted, "address(", ")")), data);
+    }
+
+    /// The emitted literal is EIP-55 checksummed. `solc` rejects a forty digit
+    /// hex literal whose case does not carry the checksum, so a generated file
+    /// holding an all-lowercase address does not compile. `vm.parseAddress`
+    /// accepts either form, so the round trip cannot tell them apart and this
+    /// is stated against a reference that derives the checksum from the
+    /// address's own bits.
+    function testAddressConstantStringChecksummed(address data) external view {
+        string memory emitted = LibCodeGen.addressConstantString(vm, "/// @dev Fuzz.", "FUZZ", data);
+        assertEq(LibCodeGenSlow.betweenSlow(emitted, "address(", ")"), LibCodeGenSlow.checksumAddressSlow(data));
     }
 
     /// A declaration of exactly the maximum length stays on one line. `forge fmt`
@@ -72,14 +94,46 @@ contract LibCodeGenAddressConstantStringTest is Test {
     /// declaration built from those literals, wrapped exactly when measuring the
     /// one line form says it does not fit. Fuzzed over every input because each
     /// term of the library's hand computed sum has to be right for this to hold.
-    function testAddressConstantStringMatchesMeasuredLine(string memory comment, string memory name, address data)
+    /// The name is built from the seed rather than fuzzed directly because
+    /// random bytes are essentially never an identifier, and a name that is not
+    /// one is rejected before anything is emitted at all.
+    function testAddressConstantStringMatchesMeasuredLine(string memory comment, bytes memory seed, address data)
         external
         view
     {
+        string memory name = LibCodeGenSlow.nameFromSeedSlow(seed);
         assertEq(
             LibCodeGen.addressConstantString(vm, comment, name, data),
             LibCodeGenSlow.addressConstantStringSlow(vm, comment, name, data)
         );
+    }
+
+    /// The name is interpolated verbatim into an `address constant` declaration,
+    /// so a name that is not a Solidity identifier is refused rather than
+    /// emitted. A space or a `-` produces a file that does not compile, and a
+    /// `;` one that compiles into a different set of declarations than the
+    /// caller asked for.
+    function testAddressConstantStringRejectsNonIdentifierName() external {
+        string[5] memory names = ["SOME NAME", "SOME;NAME", "SOME-NAME", "", "0LEADING"];
+        for (uint256 i = 0; i < names.length; i++) {
+            vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, names[i]));
+            this.callAddressConstantString("/// @dev Bad name.", names[i], SOME_ADDRESS);
+        }
+    }
+
+    /// The set of names that emit is exactly the set of Solidity identifiers.
+    /// Stated against the reference alphabet so that neither a check that
+    /// rejects too much nor one that rejects nothing at all passes.
+    function testAddressConstantStringNameMustBeIdentifier(string memory name, address data) external {
+        if (LibCodeGenSlow.isIdentifierSlow(name)) {
+            assertEq(
+                this.callAddressConstantString("/// @dev Fuzz.", name, data),
+                LibCodeGenSlow.addressConstantStringSlow(vm, "/// @dev Fuzz.", name, data)
+            );
+        } else {
+            vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, name));
+            this.callAddressConstantString("/// @dev Fuzz.", name, data);
+        }
     }
 
     /// An empty comment emits no comment line rather than an empty one. Two

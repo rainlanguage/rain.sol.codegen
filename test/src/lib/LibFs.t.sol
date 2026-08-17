@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
-import {InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
@@ -133,7 +133,7 @@ contract LibFsTest is Test {
     /// No path is produced for the name at all, and the error carries the name
     /// that was rejected so a build failure says which one it was.
     function assertNameRejected(string memory contractName) internal {
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, contractName));
+        vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, contractName));
         iExternal.pathForContract(contractName);
     }
 
@@ -167,7 +167,7 @@ contract LibFsTest is Test {
     /// string is essentially never an identifier.
     function testPathForContractRejectsEveryNonIdentifierName(bytes memory nameBytes) external {
         string memory contractName = string(nameBytes);
-        vm.assume(!LibCodeGenSlow.isContractNameSlow(contractName));
+        vm.assume(!LibCodeGenSlow.isIdentifierSlow(contractName));
         assertNameRejected(contractName);
     }
 

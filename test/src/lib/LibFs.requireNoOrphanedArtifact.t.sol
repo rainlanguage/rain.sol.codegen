@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibFs, GENERATED_DIR, OrphanedGeneratedArtifact} from "src/lib/LibFs.sol";
-import {InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
@@ -32,6 +32,15 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
 
     constructor() {
         iExternal = new LibFsExternal();
+    }
+
+    /// The check is one read of `GENERATED_DIR`, and `src/generated/` holds no
+    /// committed file, so nothing in a fresh clone creates it. Every test here
+    /// also writes its fixture there directly, and a filtered run may be only
+    /// one of them, so the directory is not something this contract can inherit
+    /// from a test that happened to run earlier.
+    function setUp() external {
+        vm.createDir(GENERATED_DIR, true);
     }
 
     /// Removes whatever is at `path`, so a test establishes its own
@@ -262,9 +271,9 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
     /// not a Solidity identifier.
     function testRequireNoOrphanedArtifactRejectsEveryNonIdentifierName(bytes memory nameBytes) external {
         string memory contractName = string(nameBytes);
-        vm.assume(!LibCodeGenSlow.isContractNameSlow(contractName));
+        vm.assume(!LibCodeGenSlow.isIdentifierSlow(contractName));
 
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, contractName));
+        vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, contractName));
         iExternal.requireNoOrphanedArtifact(vm, contractName);
     }
 }

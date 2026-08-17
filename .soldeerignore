@@ -1,15 +1,13 @@
 .DS_Store
-.gas-snapshot
 .git
 .github
 .gitignore
 .pre-commit-config.yaml
 .soldeerignore
-.vscode
+/.audit
 /audit
 /cache
 /dependencies
-/docs
 /flake.lock
 /flake.nix
 /foundry.toml

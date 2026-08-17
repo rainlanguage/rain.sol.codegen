@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {VmSafe} from "forge-std-1.16.1/src/Vm.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
+import {VmSafe} from "forge-std-1.16.2/src/Vm.sol";
 import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 
 /// @title LibFsIsPresentTest
@@ -11,11 +11,21 @@ import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 /// that lands somewhere other than the path it was given, so what it answers for
 /// a symlink is asserted here together with the write that depends on it.
 ///
-/// Symlinks are built with `ln` because forge-std 1.16.1 has no cheatcode that
+/// Symlinks are built with `ln` because forge-std 1.16.2 has no cheatcode that
 /// creates one, and they are read back with `readlink`, which reports the path
 /// itself and fails on anything that is not a symlink. `vm.readLink` is what the
 /// library uses, so it is deliberately not what asserts here.
 contract LibFsIsPresentTest is Test {
+    /// `src/generated/` holds no committed file, so nothing in a fresh clone
+    /// creates it, and none of `ln`, `vm.writeFile` or `vm.createDir` for a
+    /// child of it creates the parent. `buildFileForContract` creates it for
+    /// itself, but suites run in any order and a filtered run may be only this
+    /// one, so this contract creates it rather than inheriting it from whatever
+    /// ran first.
+    function setUp() external {
+        vm.createDir(GENERATED_DIR, true);
+    }
+
     /// Every path this contract hands to the shell is built here from a bare
     /// name, so no test in it can name a path outside the generated directory.
     function pathFor(string memory name) internal pure returns (string memory) {
@@ -150,8 +160,19 @@ contract LibFsIsPresentTest is Test {
         assertFalse(vm.exists(pathFor(linkName)), "the link is not dangling");
 
         string memory body = "\n// dangling\n";
-        LibFs.buildFileForContract(vm, address(this), name, body);
-        LibFs.buildFileForContract(vm, address(this), controlName, body);
+        // The licence and copyright reach the header and nothing here reads the
+        // header, so this repo's own values stand in for a caller's.
+        LibFs.buildFileForContract(
+            vm, address(this), name, "LicenseRef-DCL-1.0", "Copyright (c) 2020 Rain Open Source Software Ltd", body
+        );
+        LibFs.buildFileForContract(
+            vm,
+            address(this),
+            controlName,
+            "LicenseRef-DCL-1.0",
+            "Copyright (c) 2020 Rain Open Source Software Ltd",
+            body
+        );
 
         assertFalse(vm.exists(pathFor(targetName)), "the write followed the link to its target");
         assertTrue(readlink(linkName).exitCode != 0, "the path is still a symlink");
@@ -164,5 +185,60 @@ contract LibFsIsPresentTest is Test {
         remove(linkName);
         remove(targetName);
         remove(controlFileName);
+    }
+
+    /// A symlink at the generated path whose target exists is replaced by a
+    /// regular file holding the generated content, and the target does not
+    /// receive it: the write goes to the path, not through it. The target is
+    /// removed along the way, which is what makes the path free to hold a
+    /// regular file.
+    ///
+    /// The content is compared against a second contract generated at a path
+    /// that held nothing, so the claim is that the two cases produce the same
+    /// file rather than that some particular bytes appear.
+    function testBuildFileForContractReplacesLiveSymlink() external {
+        string memory name = "LibFsIsPresentLive";
+        string memory linkName = "LibFsIsPresentLive.sol";
+        string memory targetName = "LibFsIsPresentLiveTarget.txt";
+        string memory controlName = "LibFsIsPresentLiveControl";
+        string memory controlFileName = "LibFsIsPresentLiveControl.sol";
+        remove(linkName);
+        remove(targetName);
+        remove(controlFileName);
+
+        vm.writeFile(pathFor(targetName), "SENTINEL");
+        symlink(linkName, targetName);
+        assertEq(LibFs.pathForContract(name), pathFor(linkName), "the link is not where the write goes");
+        assertEq(readlink(linkName).exitCode, 0, "the path under test is not a symlink");
+        assertTrue(vm.exists(pathFor(linkName)), "the link does not resolve");
+        assertEq(vm.readFile(pathFor(targetName)), "SENTINEL", "the link target is not the seeded file");
+
+        string memory body = "\n// live\n";
+        // The licence and copyright reach the header and nothing here reads the
+        // header, so this repo's own values stand in for a caller's.
+        LibFs.buildFileForContract(
+            vm, address(this), name, "LicenseRef-DCL-1.0", "Copyright (c) 2020 Rain Open Source Software Ltd", body
+        );
+        LibFs.buildFileForContract(
+            vm,
+            address(this),
+            controlName,
+            "LicenseRef-DCL-1.0",
+            "Copyright (c) 2020 Rain Open Source Software Ltd",
+            body
+        );
+
+        bool linkIsStillASymlink = readlink(linkName).exitCode == 0;
+        bool targetExists = vm.exists(pathFor(targetName));
+        string memory written = vm.readFile(pathFor(linkName));
+        string memory control = vm.readFile(pathFor(controlFileName));
+
+        remove(linkName);
+        remove(targetName);
+        remove(controlFileName);
+
+        assertFalse(linkIsStillASymlink, "the path is still a symlink");
+        assertFalse(targetExists, "the link target survived the write");
+        assertEq(written, control, "the file at the path is not what a write to a path holding nothing produces");
     }
 }

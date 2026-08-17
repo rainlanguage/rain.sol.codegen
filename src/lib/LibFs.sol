@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity ^0.8.25;
 
-import {Vm} from "forge-std-1.16.1/src/Vm.sol";
+import {Vm} from "forge-std-1.16.2/src/Vm.sol";
 import {LibCodeGen} from "./LibCodeGen.sol";
 
 /// @dev The directory that generated contract files are written to, relative to
@@ -10,11 +10,11 @@ import {LibCodeGen} from "./LibCodeGen.sol";
 /// path, so it is a cross repo contract rather than an internal detail.
 string constant GENERATED_DIR = "src/generated";
 
-/// Thrown when `GENERATED_DIR` holds an artifact for a contract other than the
-/// one `pathForContract` names for it. Consumers commit these files and import
-/// them by path, so an artifact this library does not write is one nothing
-/// regenerates: its imports keep resolving to a frozen codehash while the build
-/// reports success.
+/// Thrown when the generated directory holds an artifact for a contract other
+/// than the one `pathForContract` names for it. Consumers commit these files
+/// and import them by path, so an artifact this library does not write is one
+/// nothing regenerates: its imports keep resolving to a frozen codehash while
+/// the build reports success.
 /// @param path The artifact nothing regenerates, relative to the project root.
 error OrphanedGeneratedArtifact(string path);
 
@@ -40,8 +40,27 @@ library LibFs {
     /// @param contractName The name of the contract, interpolated verbatim.
     /// @return The file path as a string.
     function pathForContract(string memory contractName) internal pure returns (string memory) {
-        LibCodeGen.requireContractName(contractName);
-        return string.concat(GENERATED_DIR, "/", contractName, ".sol");
+        return pathForContractIn(GENERATED_DIR, contractName);
+    }
+
+    /// @notice Constructs the file path for a contract's generated file inside
+    /// `dir`.
+    /// @dev `pathForContract` is this function applied to `GENERATED_DIR`, so
+    /// everything stated there about the name holds here too: the path is a
+    /// direct child of `dir` for every name that is accepted at all, and an
+    /// accepted name is interpolated verbatim.
+    ///
+    /// `dir` is interpolated verbatim and is not checked, so where `dir` itself
+    /// sits is entirely the caller's, and only `fs_permissions` confines it.
+    /// That is why this is private rather than internal: the only directory a
+    /// consumer of this library writes to is `GENERATED_DIR`.
+    /// @param dir The directory to put the file in, without a trailing
+    /// separator, interpolated verbatim.
+    /// @param contractName The name of the contract, interpolated verbatim.
+    /// @return The file path as a string.
+    function pathForContractIn(string memory dir, string memory contractName) private pure returns (string memory) {
+        LibCodeGen.requireIdentifier(contractName);
+        return string.concat(dir, "/", contractName, ".sol");
     }
 
     /// The final segment of `path`: the bytes after its last `/`, or all of
@@ -88,10 +107,29 @@ library LibFs {
     /// @param vm The Vm instance for file operations.
     /// @param contractName The name of the contract.
     function requireNoOrphanedArtifact(Vm vm, string memory contractName) internal view {
-        bytes32 currentArtifact = keccak256(bytes(lastPathSegment(pathForContract(contractName))));
+        requireNoOrphanedArtifactIn(vm, GENERATED_DIR, contractName);
+    }
+
+    /// @notice Reverts if `dir` holds an artifact for `contractName` other than
+    /// the one at `pathForContractIn(dir, contractName)`.
+    /// @dev `requireNoOrphanedArtifact` is this function applied to
+    /// `GENERATED_DIR`, so everything stated there holds here too, of `dir`
+    /// rather than of `GENERATED_DIR`. It is private for the same reason
+    /// `pathForContractIn` is: the only directory a consumer of this library
+    /// writes to is `GENERATED_DIR`, and `dir` is interpolated verbatim and is
+    /// not checked.
+    ///
+    /// `dir` must exist and be readable under `fs_permissions`, because the
+    /// whole check is one read of it. Callers create it first.
+    /// @param vm The Vm instance for file operations.
+    /// @param dir The directory to read, without a trailing separator,
+    /// interpolated verbatim.
+    /// @param contractName The name of the contract.
+    function requireNoOrphanedArtifactIn(Vm vm, string memory dir, string memory contractName) private view {
+        bytes32 currentArtifact = keccak256(bytes(lastPathSegment(pathForContractIn(dir, contractName))));
         bytes memory prefix = bytes(string.concat(contractName, "."));
         //forge-lint: disable-next-line(unsafe-cheatcode)
-        Vm.DirEntry[] memory entries = vm.readDir(GENERATED_DIR);
+        Vm.DirEntry[] memory entries = vm.readDir(dir);
         for (uint256 i = 0; i < entries.length; i++) {
             bytes memory name = bytes(lastPathSegment(entries[i].path));
             if (name.length < prefix.length || keccak256(name) == currentArtifact) {
@@ -105,7 +143,7 @@ library LibFs {
                 }
             }
             if (isArtifact) {
-                revert OrphanedGeneratedArtifact(string.concat(GENERATED_DIR, "/", string(name)));
+                revert OrphanedGeneratedArtifact(string.concat(dir, "/", string(name)));
             }
         }
     }
@@ -141,42 +179,117 @@ library LibFs {
     /// of `GENERATED_DIR` and a rejected name reverts before any cheatcode is
     /// reached.
     ///
-    /// `GENERATED_DIR` is created if it does not exist, so the first generation
-    /// in a repo does not need it committed already.
+    /// `GENERATED_DIR` is created if it does not exist, along with any missing
+    /// parent of it, so the first generation in a repo does not need it
+    /// committed already.
+    ///
+    /// The whole file content is built before anything on disk is touched, and
+    /// building it reverts for an `instance` that holds no code and for a
+    /// licence or copyright `filePrefix` refuses. A revert does not roll back
+    /// cheatcode filesystem effects, so ordering the build first is what keeps
+    /// a failed generation from leaving the directory worse than it found it:
+    /// nothing is created, unlinked or written unless there is content to
+    /// write.
     ///
     /// Another artifact for the same contract already in `GENERATED_DIR`
-    /// refuses the whole call, before anything at the path is removed or
+    /// refuses the whole call, before anything at the path is unlinked or
     /// written, so a generation never lands beside a file that nothing
-    /// regenerates.
+    /// regenerates. The directory is created first, because the check is a read
+    /// of it and a consumer generating for the first time has neither the
+    /// directory nor an orphan in it.
     ///
-    /// Anything already at the path is unlinked before the write, so a symlink
+    /// The path is unlinked until it holds nothing, then written, so a symlink
     /// there is replaced by a regular file rather than written through to its
-    /// target, including a symlink whose target does not exist, and the path
-    /// does not exist between the unlink and the write.
-    /// Any manual changes to the generated file, or any other existing file at
-    /// that path, are lost.
+    /// target, whether or not that target exists, and the path does not exist
+    /// between the last unlink and the write. Taking a live symlink off the
+    /// path takes what it resolves to with it, because that is what the unlink
+    /// acts on first.
+    /// Any manual changes to the generated file, any other existing file at
+    /// that path, and whatever a symlink at that path resolves to, are lost.
+    ///
+    /// A directory at the path, and a symlink at the path that resolves to a
+    /// directory, are the cases this cannot unlink, and both revert rather than
+    /// being written into or through.
     ///
     /// The whole file is written on every call, so the same arguments always
     /// produce the same bytes. The prefix and bytecode hash constant are always
     /// included, further content is provided in the body parameter, which is
     /// expected to be generated by `LibCodeGen` by the caller.
+    ///
+    /// The file lands in the calling project's repo, so the licence it is under
+    /// and the copyright holder it names come from the caller and are subject to
+    /// `LibCodeGen.filePrefix`'s rule for them.
     /// @param vm The Vm instance for file operations.
     /// @param instance The contract instance whose bytecode hash is to be
     /// included.
     /// @param contractName The name of the contract.
+    /// @param spdxLicenseIdentifier The SPDX licence identifier the written file
+    /// declares.
+    /// @param copyrightText The copyright text the written file declares.
     /// @param body The body of the contract file to be written.
-    function buildFileForContract(Vm vm, address instance, string memory contractName, string memory body) internal {
-        string memory path = pathForContract(contractName);
+    function buildFileForContract(
+        Vm vm,
+        address instance,
+        string memory contractName,
+        string memory spdxLicenseIdentifier,
+        string memory copyrightText,
+        string memory body
+    ) internal {
+        buildFileForContract(vm, instance, GENERATED_DIR, contractName, spdxLicenseIdentifier, copyrightText, body);
+    }
+
+    /// @notice Builds a file for a generated contract inside `dir` rather than
+    /// inside `GENERATED_DIR`.
+    /// @dev Identical to `buildFileForContract` in every other respect, and
+    /// that function is this one applied to `GENERATED_DIR`: `dir` is what gets
+    /// created when it is missing, what is read for another artifact of the
+    /// same contract, and what the file is written a direct child of. `dir` is
+    /// interpolated verbatim and is not checked, so a caller
+    /// passing something other than a directory it means to own gets whatever
+    /// `fs_permissions` allows; `contractName` is still required to be a
+    /// Solidity identifier, so the name can never carry the file out of `dir`.
+    ///
+    /// This overload exists so that the directory creation is reachable from a
+    /// test without deleting `GENERATED_DIR`. Every test that generates a file
+    /// writes under `GENERATED_DIR`, and `forge` runs them in parallel, so
+    /// removing it to make it missing races all of them.
+    /// @param vm The Vm instance for file operations.
+    /// @param instance The contract instance whose bytecode hash is to be
+    /// included.
+    /// @param dir The directory to put the file in, without a trailing
+    /// separator, interpolated verbatim.
+    /// @param contractName The name of the contract.
+    /// @param spdxLicenseIdentifier The SPDX licence identifier the written file
+    /// declares.
+    /// @param copyrightText The copyright text the written file declares.
+    /// @param body The body of the contract file to be written.
+    function buildFileForContract(
+        Vm vm,
+        address instance,
+        string memory dir,
+        string memory contractName,
+        string memory spdxLicenseIdentifier,
+        string memory copyrightText,
+        string memory body
+    ) internal {
+        string memory path = pathForContractIn(dir, contractName);
+        string memory content = string.concat(
+            LibCodeGen.filePrefix(spdxLicenseIdentifier, copyrightText),
+            LibCodeGen.bytecodeHashConstantString(vm, instance),
+            body
+        );
         //forge-lint: disable-next-line(unsafe-cheatcode)
-        vm.createDir(GENERATED_DIR, true);
-        requireNoOrphanedArtifact(vm, contractName);
-        if (isPresent(vm, path)) {
+        vm.createDir(dir, true);
+        requireNoOrphanedArtifactIn(vm, dir, contractName);
+        // `vm.removeFile` resolves the path before it acts, so on a live symlink
+        // it takes what the link points at and leaves the link, now dangling.
+        // Every pass removes something the next one no longer finds, so this
+        // ends with the path holding nothing.
+        while (isPresent(vm, path)) {
             //forge-lint: disable-next-line(unsafe-cheatcode)
             vm.removeFile(path);
         }
         //forge-lint: disable-next-line(unsafe-cheatcode)
-        vm.writeFile(
-            path, string.concat(LibCodeGen.filePrefix(), LibCodeGen.bytecodeHashConstantString(vm, instance), body)
-        );
+        vm.writeFile(path, content);
     }
 }

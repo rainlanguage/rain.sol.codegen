@@ -12,6 +12,11 @@ error WriteReached(string path);
 /// @param path The path the removal was for.
 error RemoveFileReached(string path);
 
+/// Thrown by `RemovalVm.tryFfi` once `reportCommand` has been called, carrying
+/// the argv it was handed.
+/// @param command The command the removal built.
+error FfiReached(string[] command);
+
 /// @title RemovalVm
 /// A contract with the shape of the `Vm` functions `buildFileForContract`
 /// reaches, whose answers about the path are whatever it was constructed with.
@@ -40,6 +45,9 @@ contract RemovalVm {
 
     /// What `tryFfi` reports on stderr.
     bytes internal sStderr;
+
+    /// Whether `tryFfi` reports the argv it was handed rather than an exit code.
+    bool internal sReportCommand;
 
     constructor(VmSafe.DirEntry[] memory entries, bool pathExists, int32 exitCode, bytes memory stderrOutput) {
         // Solidity 0.8.25 cannot copy an array of structs holding dynamic
@@ -93,9 +101,27 @@ contract RemovalVm {
         entries = sEntries;
     }
 
+    /// Makes `tryFfi` report the argv it was handed instead of an exit code, for
+    /// the test that pins what the removal asks the shell for. Called on the
+    /// stand-in before the generation, which is the only point outside the
+    /// reverting call frame.
+    function reportCommand() external {
+        sReportCommand = true;
+    }
+
     /// The removal that acts on a link, reporting whatever the constructor was
     /// given.
-    function tryFfi(string[] calldata) external view returns (VmSafe.FfiResult memory result) {
+    ///
+    /// The argv is carried out in a revert rather than recorded, because every
+    /// call that reaches here goes on to revert: the write, the cheatcode
+    /// removal and the failed removal all do, and that unwinds this contract's
+    /// storage along with everything else, so a recorded command would be gone
+    /// by the time a test could read it. A revert is what survives, which is
+    /// why the write and the cheatcode removal report themselves the same way.
+    function tryFfi(string[] calldata command) external view returns (VmSafe.FfiResult memory result) {
+        if (sReportCommand) {
+            revert FfiReached(command);
+        }
         result = VmSafe.FfiResult({exitCode: iExitCode, stdout: "", stderr: sStderr});
     }
 

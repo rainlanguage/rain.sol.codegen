@@ -12,7 +12,7 @@ import {
     CodelessInstance
 } from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
-import {RemovalVm, WriteReached, RemoveFileReached} from "test/concrete/RemovalVm.sol";
+import {RemovalVm, WriteReached, RemoveFileReached, FfiReached} from "test/concrete/RemovalVm.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
@@ -482,6 +482,19 @@ contract LibFsBuildFileForContractTest is Test {
         });
     }
 
+    /// The revert data from generating `contractName` against a stand-in the
+    /// caller built, for a test that has to configure the stand-in before the
+    /// generation reaches it.
+    function removalOutcome(RemovalVm removalVm, string memory contractName) internal returns (bytes memory) {
+        try iExternal.buildFileForContract(
+            Vm(address(removalVm)), address(this), contractName, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, "\n// body\n"
+        ) {
+            return "";
+        } catch (bytes memory reason) {
+            return reason;
+        }
+    }
+
     /// The revert data from generating `contractName` against a `Vm` whose
     /// directory listing is `entries`, whose path resolves or does not according
     /// to `pathExists`, and whose removal exits with `exitCode`. Nothing here
@@ -495,14 +508,7 @@ contract LibFsBuildFileForContractTest is Test {
         int32 exitCode,
         bytes memory stderrOutput
     ) internal returns (bytes memory) {
-        Vm removalVm = Vm(address(new RemovalVm(entries, pathExists, exitCode, stderrOutput)));
-        try iExternal.buildFileForContract(
-            removalVm, address(this), contractName, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, "\n// body\n"
-        ) {
-            return "";
-        } catch (bytes memory reason) {
-            return reason;
-        }
+        return removalOutcome(new RemovalVm(entries, pathExists, exitCode, stderrOutput), contractName);
     }
 
     /// `removalOutcome` for a listing holding only the generated path.
@@ -551,6 +557,36 @@ contract LibFsBuildFileForContractTest is Test {
             reason,
             abi.encodeWithSelector(WriteReached.selector, LibFs.pathForContract(name)),
             "a removal that succeeded did not reach the write"
+        );
+    }
+
+    /// What the removal asks the shell for, argument for argument. Everything
+    /// the safety of shelling out rests on is in this argv rather than in what
+    /// the removal reports: `-f` so a link is removed rather than prompted about
+    /// on a terminal nothing reads, no `-r` so a symlink to a directory cannot
+    /// take the directory with it, `--` so a path beginning with `-` is an
+    /// operand rather than an option, and the generated path as the only
+    /// operand. The other removal tests observe the exit code the stand-in was
+    /// built with, which an argv regression does not change, so each of those
+    /// flags going missing is invisible to all of them.
+    function testBuildFileForContractRemovesTheSymlinkWithAForcedRmAndEndedOptions() external {
+        string memory name = "LibFsBuildRemovalCommand";
+        VmSafe.DirEntry[] memory entries = new VmSafe.DirEntry[](1);
+        entries[0] = entryNamed(name, true);
+        RemovalVm removalVm = new RemovalVm(entries, true, 0, "");
+        removalVm.reportCommand();
+
+        bytes memory reason = removalOutcome(removalVm, name);
+
+        string[] memory command = new string[](4);
+        command[0] = "rm";
+        command[1] = "-f";
+        command[2] = "--";
+        command[3] = LibFs.pathForContract(name);
+        assertEq(
+            reason,
+            abi.encodeWithSelector(FfiReached.selector, command),
+            "the removal asked for something other than a forced rm of the path with its options ended"
         );
     }
 

@@ -278,6 +278,10 @@ contract LibFsBuildFileForContractTest is Test {
     /// this library commits what it writes, and `S01-Issuer/st0x.deploy` commits
     /// it into append-only deploy-pin snapshots, so a header naming the wrong
     /// holder is permanent in another org's release record.
+    ///
+    /// The file is read and removed before anything is asserted. A failing
+    /// assertion ends the test where it stands, so asserting first would leave
+    /// the written file in `src/generated/` for whatever runs next.
     function testBuildFileForContractCarriesTheCallersLicenceAndCopyright() external {
         string memory name = "LibFsBuildForeignLicence";
         cleanup(name);
@@ -287,13 +291,14 @@ contract LibFsBuildFileForContractTest is Test {
         LibFs.buildFileForContract(vm, instance, name, "MIT", "Copyright (c) 2026 S01 Issuer GmbH", body);
 
         string memory written = vm.readFile(LibFs.pathForContract(name));
+        cleanup(name);
+
         assertEq(written, expectedFile(instance, "MIT", "Copyright (c) 2026 S01 Issuer GmbH", body));
         assertFalse(vm.contains(written, "LicenseRef-DCL-1.0"), "this repo's licence reached another repo's file");
         assertFalse(
             vm.contains(written, "Rain Open Source Software Ltd"),
             "this repo's copyright holder reached another repo's file"
         );
-        cleanup(name);
     }
 
     /// The revert data from a write, or empty bytes when the write was

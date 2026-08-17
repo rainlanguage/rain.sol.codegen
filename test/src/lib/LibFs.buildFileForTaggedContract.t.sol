@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibFs, InvalidTag} from "src/lib/LibFs.sol";
+import {LibFs, GENERATED_DIR, InvalidTag} from "src/lib/LibFs.sol";
 import {InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
@@ -31,10 +31,19 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         iExternal = new LibFsExternal();
     }
 
-    /// Every test writes under `src/generated/`, which is a committed directory
-    /// in this repo. Each test owns a distinct tag so parallel suites cannot
-    /// collide, none of the tags is one this repo commits, and each removes the
-    /// directory it created.
+    /// `src/generated/` holds no committed file, so nothing in a fresh clone
+    /// creates it, and none of `vm.writeFile` or `vm.createDir` for a child of
+    /// it creates the parent. `buildFileForTaggedContract` creates it for
+    /// itself, but the untagged sentinel below is written directly, and suites
+    /// run in any order, so this contract creates it rather than inheriting it
+    /// from whatever ran first.
+    function setUp() external {
+        vm.createDir(GENERATED_DIR, true);
+    }
+
+    /// Every test writes under `src/generated/`. Each test owns a distinct tag
+    /// so parallel suites cannot collide, and each removes the directory it
+    /// created.
     function cleanup(string memory tag) internal {
         string memory dir = LibFs.dirForTag(tag);
         if (vm.exists(dir)) {

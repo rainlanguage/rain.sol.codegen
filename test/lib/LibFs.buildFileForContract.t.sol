@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibFs} from "src/lib/LibFs.sol";
-import {LibCodeGen, InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
@@ -30,10 +30,11 @@ contract LibFsBuildFileForContractTest is Test {
         iExternal = new LibFsExternal();
     }
 
-    /// Every test writes under `src/generated/`, which is a committed directory
-    /// in this repo. Each test owns a distinct name so parallel suites cannot
-    /// collide, none of them is `CodeGennable` (the committed artifact), and
-    /// each removes its file again.
+    /// Every test writes under `src/generated/`, which holds nothing committed
+    /// in this repo and is created on demand by `buildFileForContract` itself.
+    /// Everything that lands there during a run is this suite's scratch. Each
+    /// test owns a distinct name so parallel suites cannot collide, and each
+    /// removes its file again.
     function cleanup(string memory contractName) internal {
         string memory path = LibFs.pathForContract(contractName);
         if (vm.exists(path)) {
@@ -196,31 +197,6 @@ contract LibFsBuildFileForContractTest is Test {
         assertEq(vm.readFile(LibFs.pathForContract(nameB)), expectedFile(instance, bodyB), "sibling b is wrong");
         cleanup(nameA);
         cleanup(nameB);
-    }
-
-    /// `src/generated/CodeGennable.sol` is committed, and `script/Build.sol`
-    /// builds it through this function. Nothing in `forge test` noticed when it
-    /// went stale — only the separate `rainix-copy-artifacts` job did, by
-    /// regenerating and diffing. This asserts the committed file still opens
-    /// with what `buildFileForContract` writes today, so drift between the
-    /// library and the artifact it produced reds the suite too.
-    ///
-    /// Deliberately built from `LibCodeGen` here, unlike the tests above: the
-    /// claim is that the committed bytes match what the library emits now, so
-    /// the library is the correct side to read it from and the file on disk is
-    /// the oracle.
-    function testBuildFileForContractCommittedArtifactIsCurrent() external {
-        address instance = address(new CodeGennable());
-        string memory header =
-            string.concat(LibCodeGen.filePrefix(), LibCodeGen.bytecodeHashConstantString(vm, instance));
-        bytes memory committed = bytes(vm.readFile(LibFs.pathForContract("CodeGennable")));
-
-        assertTrue(committed.length >= bytes(header).length, "committed artifact is shorter than the header");
-        bytes memory actual = new bytes(bytes(header).length);
-        for (uint256 i = 0; i < actual.length; i++) {
-            actual[i] = committed[i];
-        }
-        assertEq(actual, bytes(header), "committed artifact is stale, regenerate with script/Build.sol");
     }
 
     /// The bytecode hash is read from the instance that was passed in, not from

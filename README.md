@@ -28,6 +28,15 @@ pointers, which pointers feed back into the generation. This cycle means
 pointers may need to be regenerated several times until they reach a fixed point
 where neither pointer values nor the codehash of any consuming contract shift.
 
+Reaching that fixed point is the consumer's job: nothing bounds or iterates the
+loop. A tree that has not settled fails the currency check exactly as a tree
+nobody regenerated does — see
+[`rainix-copy-artifacts.yaml`](https://github.com/rainlanguage/rainix/blob/main/.github/workflows/rainix-copy-artifacts.yaml)
+— so regenerate until the working tree stops changing before committing, and
+read a tree that never stops changing as a cycle that does not converge rather
+than one more pass to run. Committing part-way records a deployed-bytecode hash
+for a contract compiled against a different pass of the same file.
+
 ## Formatter requirements
 
 `LibCodeGen` wraps the declarations it emits itself, deciding against

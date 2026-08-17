@@ -73,8 +73,11 @@ file, so a completed run leaves the directory empty and invisible to git. Same
 arrangement as `meta/`, which the meta-hash tests use the same way. Anything
 left there after an interrupted run is scratch, and `git status` will say so.
 
-On top of the above, CI applies rainix's org-wide static checks via
-[`.github/workflows/rainix.yaml`](.github/workflows/rainix.yaml).
+[`.github/workflows/rainix.yaml`](.github/workflows/rainix.yaml) is what runs
+all four in CI, via rainix's `rainix-sol.yaml`. It also applies org-wide gates
+that none of the four covers — no ignored tests, no git submodules, an agent
+context cap, append-only frozen snapshots, no custom NatSpec, and one contract
+per `.sol` file — so a green local run is necessary but not sufficient.
 
 Use the nix-pinned `forge` for all development.
 

@@ -2,13 +2,27 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity ^0.8.25;
 
-import {Vm} from "forge-std-1.16.2/src/Vm.sol";
+import {Vm, VmSafe} from "forge-std-1.16.2/src/Vm.sol";
 import {LibCodeGen} from "./LibCodeGen.sol";
 
 /// @dev The directory that generated contract files are written to, relative to
 /// the project root. Consumers commit this directory and import from it by
 /// path, so it is a cross repo contract rather than an internal detail.
 string constant GENERATED_DIR = "src/generated";
+
+/// Thrown when the symlink found at a generated path could not be removed.
+///
+/// The write that would have followed does not happen. A link still at the path
+/// is a write that lands on whatever the link resolves to instead, which is the
+/// one outcome that has to be impossible here, so a removal that did not happen
+/// ends the call rather than being assumed.
+///
+/// `ffi = true` is what the removal needs and what a consumer that has not
+/// enabled it is missing; that case reverts before this, out of the cheatcode.
+/// @param path The path the symlink is at.
+/// @param exitCode The exit code the removal reported.
+/// @param stderr What the removal wrote to stderr.
+error SymlinkRemovalFailed(string path, int32 exitCode, bytes stderr);
 
 /// Thrown when the generated directory holds an artifact for a contract other
 /// than the one `pathForContract` names for it. Consumers commit these files
@@ -237,9 +251,11 @@ library LibFs {
     /// @notice True if anything occupies `path`, including a symlink whose
     /// target does not exist.
     /// @dev `vm.exists` answers for whatever the path resolves to, so it reports
-    /// a symlink with no target as absent. `vm.readLink` answers for the path
-    /// itself and reverts unless the path is a symlink, so it sees the link that
-    /// `vm.exists` does not.
+    /// a symlink with no target as absent. `vm.readLink` is what covers that
+    /// one: foundry resolves a path before it reads the link at it, so the
+    /// cheatcode succeeds only where there is nothing to resolve to, and reverts
+    /// on a symlink that does resolve — which is the case `vm.exists` has
+    /// already answered. Between them every symlink is present.
     /// @param vm The Vm instance for file operations.
     /// @param path The path to check, which must be readable under
     /// `fs_permissions`.
@@ -254,6 +270,96 @@ library LibFs {
             return true;
         } catch {
             return false;
+        }
+    }
+
+    /// @notice True if `path`, which must be a direct child of `dir`, is itself
+    /// a symlink, whether or not it resolves to anything.
+    /// @dev Every cheatcode that takes a path resolves it before it acts, so
+    /// none of them can tell a live symlink from the file at the other end of
+    /// it: `vm.exists`, `vm.isFile` and `vm.fsMetadata(...).isSymlink` all
+    /// answer for the target, and `vm.readLink` reverts because the path it is
+    /// handed has already stopped being a link. `vm.readDir` is the one that
+    /// does not, because what it reports comes from walking the directory rather
+    /// than from resolving a path, so each entry's `isSymlink` is about the
+    /// entry itself. That holds whether or not the walk is told to follow
+    /// links, and `dir` is resolved before the walk starts either way, so a
+    /// `dir` that is itself a symlink lists its target's children.
+    ///
+    /// Depth 1 is what confines the listing to the direct children of `dir`,
+    /// and only a direct child is `path`. A deeper listing reports entries from
+    /// subdirectories under the same name, which is not hypothetical here:
+    /// `src/generated/<tag>/<Name>.sol` is a frozen snapshot sitting one level
+    /// under `src/generated/<Name>.sol` and sharing its name exactly. The
+    /// listing comes back sorted by path, so whichever of the two sorts first
+    /// would be the one that answered, and a snapshot answering for a live
+    /// symlink at the path is the removal reaching the link's target again.
+    ///
+    /// The entry is found by the name it has in the directory, compared exactly:
+    /// `vm.readDir` reports absolute paths, so that is the only part of an entry
+    /// that can be held against a path built from `dir`. A filesystem that
+    /// resolves two spellings of a name to one file therefore reports the
+    /// spelling it stored, and a `path` spelled the other way does not match it,
+    /// which is the same case insensitivity `pathForContract` already states.
+    /// @param vm The Vm instance for file operations.
+    /// @param dir The directory holding `path`, which must exist and be readable
+    /// under `fs_permissions`.
+    /// @param path The path to check.
+    /// @return True if the path itself is a symlink.
+    function isSymlinkIn(Vm vm, string memory dir, string memory path) private view returns (bool) {
+        bytes32 name = keccak256(bytes(lastPathSegment(path)));
+        VmSafe.DirEntry[] memory entries = vm.readDir(dir, 1, false);
+        for (uint256 i = 0; i < entries.length; i++) {
+            if (keccak256(bytes(lastPathSegment(entries[i].path))) == name) {
+                return entries[i].isSymlink;
+            }
+        }
+        return false;
+    }
+
+    /// @notice Removes the symlink at `path`, leaving whatever it resolves to
+    /// exactly as it was.
+    /// @dev Every cheatcode that removes something resolves the path before it
+    /// acts, so `vm.removeFile` on a live symlink deletes the file at the other
+    /// end of the link and leaves the link behind, now dangling. What the caller
+    /// asked to replace is the path; the file the link points at is a second
+    /// file at a second path that nothing about generating here names, and it is
+    /// bounded only by `fs_permissions`. forge-std 1.16.2 has no cheatcode that
+    /// acts on the link, so this shells out instead: `rm` acts on the name it is
+    /// given and never follows a symlink operand, whatever is at the other end.
+    ///
+    /// Only reached once `isSymlinkIn` has answered true, so `rm` is never asked
+    /// to remove a directory, and the `-r` that would let it is not passed. A
+    /// symlink that resolves to a directory is still a symlink, so it is the
+    /// link that goes and the directory it pointed at is left alone. `-f` is
+    /// passed so that a link is removed rather than prompted about on a terminal
+    /// that nothing is reading.
+    ///
+    /// The command is an argv array rather than a command line, so no shell
+    /// interprets anything in `path`, and `--` ends the options so that a caller
+    /// supplied `dir` beginning with `-` cannot be read as one.
+    ///
+    /// `fs_permissions` does not confine `rm` the way it confines a cheatcode.
+    /// What confines this is the `vm.createDir(dir, true)` that runs ahead of it
+    /// and is permission checked: `path` is always a direct child of `dir`, so a
+    /// `dir` the grant refuses reverts before anything is unlinked.
+    ///
+    /// This is the only thing in this library that needs `ffi = true`, and it
+    /// runs only when a symlink is actually at the path, so a consumer that has
+    /// not enabled ffi generates normally and gets a revert in the one case that
+    /// cannot be handled without destroying something. Nothing is lost either
+    /// way.
+    /// @param vm The Vm instance for file operations.
+    /// @param path The path of the symlink to remove.
+    function removeSymlink(Vm vm, string memory path) private {
+        string[] memory command = new string[](4);
+        command[0] = "rm";
+        command[1] = "-f";
+        command[2] = "--";
+        command[3] = path;
+        VmSafe.FfiResult memory result = vm.tryFfi(command);
+        if (result.exitCode != 0) {
+            revert SymlinkRemovalFailed(path, result.exitCode, result.stderr);
         }
     }
 
@@ -284,18 +390,26 @@ library LibFs {
     /// of it and a consumer generating for the first time has neither the
     /// directory nor an orphan in it.
     ///
-    /// The path is unlinked until it holds nothing, then written, so a symlink
+    /// Whatever is at the path comes off it before the write, so a symlink
     /// there is replaced by a regular file rather than written through to its
-    /// target, whether or not that target exists, and the path does not exist
-    /// between the last unlink and the write. Taking a live symlink off the
-    /// path takes what it resolves to with it, because that is what the unlink
-    /// acts on first.
-    /// Any manual changes to the generated file, any other existing file at
-    /// that path, and whatever a symlink at that path resolves to, are lost.
+    /// target, whether or not that target exists, and the path holds nothing
+    /// between the removal and the write.
     ///
-    /// A directory at the path, and a symlink at the path that resolves to a
-    /// directory, are the cases this cannot unlink, and both revert rather than
-    /// being written into or through.
+    /// A symlink comes off by removing the link and nothing else. What it
+    /// resolves to is left byte for byte as it was, wherever it is, however far
+    /// the calling project's `fs_permissions` reach: the caller asked to
+    /// generate at the path, and the file at the other end of a link is a
+    /// second file at a second path that nothing here named. Removing a link
+    /// needs `ffi = true` and reverts without it, so a consumer that has not
+    /// enabled ffi refuses that case rather than generating through it.
+    ///
+    /// Any manual changes to the generated file, and any other existing file at
+    /// that path, are lost.
+    ///
+    /// A directory at the path is the one thing that cannot come off it, and
+    /// reverts rather than being cleared or written into. A symlink that
+    /// resolves to a directory is a link like any other: the link goes and the
+    /// directory stays.
     ///
     /// The whole file is written on every call, so the same arguments always
     /// produce the same bytes. The prefix and bytecode hash constant are always
@@ -367,13 +481,28 @@ library LibFs {
         //forge-lint: disable-next-line(unsafe-cheatcode)
         vm.createDir(dir, true);
         requireNoOrphanedArtifactIn(vm, dir, contractName);
-        // `vm.removeFile` resolves the path before it acts, so on a live symlink
-        // it takes what the link points at and leaves the link, now dangling.
-        // Every pass removes something the next one no longer finds, so this
-        // ends with the path holding nothing.
-        while (isPresent(vm, path)) {
-            //forge-lint: disable-next-line(unsafe-cheatcode)
-            vm.removeFile(path);
+        // Whatever is at the path has to come off it before the write, or the
+        // write lands on what a link there resolves to rather than on the path.
+        //
+        // `vm.removeFile` resolves the path before it acts, so it removes the
+        // path itself except where the path is a symlink that resolves to
+        // something, and there it removes that something instead and leaves the
+        // link. That is the one case it cannot be used for, so it is the one
+        // case that takes the link off directly. A path that resolves to
+        // nothing, whether it is a link with no target or a cycle of them, has
+        // nothing else for the cheatcode to reach, and a path that is not a link
+        // resolves to itself.
+        //
+        // Either way the path holds nothing afterwards or the call has reverted,
+        // so one pass is the whole job. A directory is what reverts: it is the
+        // one thing that cannot come off the path at all.
+        if (isPresent(vm, path)) {
+            if (vm.exists(path) && isSymlinkIn(vm, dir, path)) {
+                removeSymlink(vm, path);
+            } else {
+                //forge-lint: disable-next-line(unsafe-cheatcode)
+                vm.removeFile(path);
+            }
         }
         //forge-lint: disable-next-line(unsafe-cheatcode)
         vm.writeFile(path, content);
@@ -392,12 +521,24 @@ library LibFs {
     /// `GENERATED_DIR` itself, so the first generation for a tag does not need
     /// it committed already.
     ///
-    /// The path is unlinked until it holds nothing, then written, so a symlink
+    /// Whatever is at the path comes off it before the write, so a symlink
     /// there is replaced by a regular file rather than written through to its
-    /// target, whether or not that target exists, and the path does not exist
-    /// between the last unlink and the write.
-    /// Any manual changes to the generated file, any other existing file at
-    /// that path, and whatever a symlink at that path resolves to, are lost.
+    /// target, whether or not that target exists, and the path holds nothing
+    /// between the removal and the write.
+    ///
+    /// A symlink comes off by removing the link and nothing else. What it
+    /// resolves to is left byte for byte as it was, wherever it is, however far
+    /// the calling project's `fs_permissions` reach. Removing a link needs
+    /// `ffi = true` and reverts without it, so a consumer that has not enabled
+    /// ffi refuses that case rather than generating through it.
+    ///
+    /// Any manual changes to the generated file, and any other existing file at
+    /// that path, are lost.
+    ///
+    /// A directory at the path is the one thing that cannot come off it, and
+    /// reverts rather than being cleared or written into. A symlink that
+    /// resolves to a directory is a link like any other: the link goes and the
+    /// directory stays.
     ///
     /// The whole file is written on every call, so the same arguments always
     /// produce the same bytes. The prefix and bytecode hash constant are always

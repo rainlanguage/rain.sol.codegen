@@ -1,0 +1,138 @@
+// SPDX-License-Identifier: LicenseRef-DCL-1.0
+// SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
+pragma solidity =0.8.25;
+
+import {VmSafe} from "forge-std-1.16.2/src/Vm.sol";
+
+/// Thrown by `RemovalVm.writeFile`.
+/// @param path The path the write was for.
+error WriteReached(string path);
+
+/// Thrown by `RemovalVm.removeFile`.
+/// @param path The path the removal was for.
+error RemoveFileReached(string path);
+
+/// Thrown by `RemovalVm.tryFfi` once `reportCommand` has been called, carrying
+/// the argv it was handed.
+/// @param command The command the removal built.
+error FfiReached(string[] command);
+
+/// @title RemovalVm
+/// A contract with the shape of the `Vm` functions `buildFileForContract`
+/// reaches, whose answers about the path are whatever it was constructed with.
+///
+/// `buildFileForContract` decides how to take what is at the generated path off
+/// it from whether the path resolves and from what the directory listing says
+/// the entry is, and then decides whether to go on to the write from what the
+/// removal reported. None of those three is something a real filesystem
+/// produces on demand: a listing that disagrees with the path does not happen,
+/// and a removal that reports failure would have to be arranged by revoking
+/// permissions, which then answers differently depending on which user the run
+/// happens to have.
+///
+/// Nothing here touches disk. Both removals and the write revert instead of
+/// happening, so which one the library reached is what a test observes, and no
+/// file lands anywhere for any of them.
+contract RemovalVm {
+    /// What `readDir` reports.
+    VmSafe.DirEntry[] internal sEntries;
+
+    /// What `exists` reports.
+    bool internal immutable iPathExists;
+
+    /// The exit code `tryFfi` reports.
+    int32 internal immutable iExitCode;
+
+    /// What `tryFfi` reports on stderr.
+    bytes internal sStderr;
+
+    /// Whether `tryFfi` reports the argv it was handed rather than an exit code.
+    bool internal sReportCommand;
+
+    constructor(VmSafe.DirEntry[] memory entries, bool pathExists, int32 exitCode, bytes memory stderrOutput) {
+        // Solidity 0.8.25 cannot copy an array of structs holding dynamic
+        // members from memory to storage in one assignment.
+        for (uint256 i = 0; i < entries.length; i++) {
+            VmSafe.DirEntry storage entry = sEntries.push();
+            entry.errorMessage = entries[i].errorMessage;
+            entry.path = entries[i].path;
+            entry.depth = entries[i].depth;
+            entry.isDir = entries[i].isDir;
+            entry.isSymlink = entries[i].isSymlink;
+        }
+        iPathExists = pathExists;
+        iExitCode = exitCode;
+        sStderr = stderrOutput;
+    }
+
+    /// The generated content is built before anything else happens, and the
+    /// bytecode hash constant is formatted through this. What it returns reaches
+    /// only a string that is never written.
+    function toString(bytes32) external pure returns (string memory) {
+        return "0x00";
+    }
+
+    /// The directory is created before the path is inspected. Nothing on disk
+    /// backs this Vm, so there is nothing to create.
+    function createDir(string calldata, bool) external {}
+
+    /// Whether the path resolves to anything, as constructed.
+    function exists(string calldata) external view returns (bool) {
+        return iPathExists;
+    }
+
+    /// Reached only when the path resolves to nothing, and answering rather than
+    /// reverting is what makes the path present anyway: a link with no target.
+    function readLink(string calldata) external pure returns (string memory) {
+        return "target";
+    }
+
+    /// The listing, as constructed.
+    function readDir(string calldata, uint64, bool) external view returns (VmSafe.DirEntry[] memory entries) {
+        entries = sEntries;
+    }
+
+    /// The same listing, for the overload the orphan check reads the directory
+    /// with. One directory has one set of entries whichever overload asks for
+    /// them, so answering differently here would make the orphan check's
+    /// verdict a property of this stand-in rather than of the listing the test
+    /// constructed.
+    function readDir(string calldata) external view returns (VmSafe.DirEntry[] memory entries) {
+        entries = sEntries;
+    }
+
+    /// Makes `tryFfi` report the argv it was handed instead of an exit code, for
+    /// the test that pins what the removal asks the shell for. Called on the
+    /// stand-in before the generation, which is the only point outside the
+    /// reverting call frame.
+    function reportCommand() external {
+        sReportCommand = true;
+    }
+
+    /// The removal that acts on a link, reporting whatever the constructor was
+    /// given.
+    ///
+    /// The argv is carried out in a revert rather than recorded, because every
+    /// call that reaches here goes on to revert: the write, the cheatcode
+    /// removal and the failed removal all do, and that unwinds this contract's
+    /// storage along with everything else, so a recorded command would be gone
+    /// by the time a test could read it. A revert is what survives, which is
+    /// why the write and the cheatcode removal report themselves the same way.
+    function tryFfi(string[] calldata command) external view returns (VmSafe.FfiResult memory result) {
+        if (sReportCommand) {
+            revert FfiReached(command);
+        }
+        result = VmSafe.FfiResult({exitCode: iExitCode, stdout: "", stderr: sStderr});
+    }
+
+    /// The removal that acts on what the path resolves to.
+    function removeFile(string calldata path) external pure {
+        revert RemoveFileReached(path);
+    }
+
+    /// The write, which is the last thing `buildFileForContract` does, so
+    /// reaching it is what says the removal ahead of it was accepted.
+    function writeFile(string calldata path, string calldata) external pure {
+        revert WriteReached(path);
+    }
+}

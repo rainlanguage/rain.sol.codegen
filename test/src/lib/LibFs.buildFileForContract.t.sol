@@ -3,7 +3,8 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
-import {LibFs, GENERATED_DIR, OrphanedGeneratedArtifact} from "src/lib/LibFs.sol";
+import {Vm, VmSafe} from "forge-std-1.16.2/src/Vm.sol";
+import {LibFs, GENERATED_DIR, SymlinkRemovalFailed, OrphanedGeneratedArtifact} from "src/lib/LibFs.sol";
 import {
     InvalidIdentifier,
     InvalidSpdxLicenseIdentifier,
@@ -11,6 +12,7 @@ import {
     CodelessInstance
 } from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
+import {RemovalVm, WriteReached, RemoveFileReached, FfiReached} from "test/concrete/RemovalVm.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
@@ -465,6 +467,198 @@ contract LibFsBuildFileForContractTest is Test {
         string memory contractName = string(nameBytes);
         vm.assume(!LibCodeGenSlow.isIdentifierSlow(contractName));
         assertNameRejected(contractName);
+    }
+
+    /// One directory entry, at an absolute path that shares nothing with the
+    /// generated path but the name at the end of it. That is what `vm.readDir`
+    /// reports for a real directory, so it is what the library has to match on.
+    function entryNamed(string memory contractName, bool isSymlink) internal pure returns (VmSafe.DirEntry memory) {
+        return VmSafe.DirEntry({
+            errorMessage: "",
+            path: string.concat("/somewhere/else/entirely/", contractName, ".sol"),
+            depth: 1,
+            isDir: false,
+            isSymlink: isSymlink
+        });
+    }
+
+    /// The revert data from generating `contractName` against a stand-in the
+    /// caller built, for a test that has to configure the stand-in before the
+    /// generation reaches it.
+    function removalOutcome(RemovalVm removalVm, string memory contractName) internal returns (bytes memory) {
+        try iExternal.buildFileForContract(
+            Vm(address(removalVm)), address(this), contractName, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, "\n// body\n"
+        ) {
+            return "";
+        } catch (bytes memory reason) {
+            return reason;
+        }
+    }
+
+    /// The revert data from generating `contractName` against a `Vm` whose
+    /// directory listing is `entries`, whose path resolves or does not according
+    /// to `pathExists`, and whose removal exits with `exitCode`. Nothing here
+    /// touches disk: the whole filesystem the library sees is what the stand in
+    /// reports, and both removals and the write revert rather than happening, so
+    /// the revert data says which one was reached.
+    function removalOutcome(
+        string memory contractName,
+        VmSafe.DirEntry[] memory entries,
+        bool pathExists,
+        int32 exitCode,
+        bytes memory stderrOutput
+    ) internal returns (bytes memory) {
+        return removalOutcome(new RemovalVm(entries, pathExists, exitCode, stderrOutput), contractName);
+    }
+
+    /// `removalOutcome` for a listing holding only the generated path.
+    function removalOutcome(
+        string memory contractName,
+        bool isSymlink,
+        bool pathExists,
+        int32 exitCode,
+        bytes memory stderrOutput
+    ) internal returns (bytes memory) {
+        VmSafe.DirEntry[] memory entries = new VmSafe.DirEntry[](1);
+        entries[0] = entryNamed(contractName, isSymlink);
+        return removalOutcome(contractName, entries, pathExists, exitCode, stderrOutput);
+    }
+
+    /// A removal that reports failure leaves the link where it was, and a write
+    /// to a path a link is still at lands on whatever the link resolves to
+    /// rather than on the path. So the failure ends the call: the write is never
+    /// reached, and the exit code and what the removal said about it are carried
+    /// out in the revert rather than dropped.
+    function testBuildFileForContractRefusesToWriteWhenTheRemovalFails() external {
+        string memory name = "LibFsBuildRemovalFails";
+        bytes memory reason = removalOutcome(name, true, true, 1, "rm: cannot remove: Permission denied");
+
+        assertEq(
+            reason,
+            abi.encodeWithSelector(
+                SymlinkRemovalFailed.selector,
+                LibFs.pathForContract(name),
+                int32(1),
+                bytes("rm: cannot remove: Permission denied")
+            ),
+            "a removal that failed did not stop the write"
+        );
+    }
+
+    /// The other side of it: a removal that reports success is what lets the
+    /// call go on to the write. Without this the refusal above is satisfied by
+    /// refusing every removal, which would stop every generation over a symlink
+    /// rather than only the ones that could not be done.
+    function testBuildFileForContractWritesWhenTheRemovalSucceeds() external {
+        string memory name = "LibFsBuildRemovalSucceeds";
+        bytes memory reason = removalOutcome(name, true, true, 0, "");
+
+        assertEq(
+            reason,
+            abi.encodeWithSelector(WriteReached.selector, LibFs.pathForContract(name)),
+            "a removal that succeeded did not reach the write"
+        );
+    }
+
+    /// What the removal asks the shell for, argument for argument. Everything
+    /// the safety of shelling out rests on is in this argv rather than in what
+    /// the removal reports: `-f` so a link is removed rather than prompted about
+    /// on a terminal nothing reads, no `-r` so a symlink to a directory cannot
+    /// take the directory with it, `--` so a path beginning with `-` is an
+    /// operand rather than an option, and the generated path as the only
+    /// operand. The other removal tests observe the exit code the stand-in was
+    /// built with, which an argv regression does not change, so each of those
+    /// flags going missing is invisible to all of them.
+    function testBuildFileForContractRemovesTheSymlinkWithAForcedRmAndEndedOptions() external {
+        string memory name = "LibFsBuildRemovalCommand";
+        VmSafe.DirEntry[] memory entries = new VmSafe.DirEntry[](1);
+        entries[0] = entryNamed(name, true);
+        RemovalVm removalVm = new RemovalVm(entries, true, 0, "");
+        removalVm.reportCommand();
+
+        bytes memory reason = removalOutcome(removalVm, name);
+
+        string[] memory command = new string[](4);
+        command[0] = "rm";
+        command[1] = "-f";
+        command[2] = "--";
+        command[3] = LibFs.pathForContract(name);
+        assertEq(
+            reason,
+            abi.encodeWithSelector(FfiReached.selector, command),
+            "the removal asked for something other than a forced rm of the path with its options ended"
+        );
+    }
+
+    /// A path the listing says is not a symlink is removed by the cheatcode, not
+    /// by shelling out. That is the whole of the common case — a regular file
+    /// left by the last generation — and it is what keeps `ffi = true` a
+    /// requirement only for the case that cannot be done without it. The exit
+    /// code is set to fail so that a call which shelled out anyway is a
+    /// different revert rather than the same one.
+    function testBuildFileForContractRemovesANonSymlinkWithTheCheatcode() external {
+        string memory name = "LibFsBuildRemovalRegular";
+        bytes memory reason = removalOutcome(name, false, true, 1, "should not have run");
+
+        assertEq(
+            reason,
+            abi.encodeWithSelector(RemoveFileReached.selector, LibFs.pathForContract(name)),
+            "a path that is not a symlink was not removed by the cheatcode"
+        );
+    }
+
+    /// A symlink that resolves to nothing is removed by the cheatcode too. The
+    /// cheatcode resolves the path before it acts, so what it takes off is
+    /// whatever the path leads to; a link leading nowhere leads to the link
+    /// itself, and there is no second file for it to reach. Shelling out here
+    /// instead would make `ffi = true` a requirement of a case that has never
+    /// needed one.
+    function testBuildFileForContractRemovesADanglingSymlinkWithTheCheatcode() external {
+        string memory name = "LibFsBuildRemovalDangling";
+        bytes memory reason = removalOutcome(name, true, false, 1, "should not have run");
+
+        assertEq(
+            reason,
+            abi.encodeWithSelector(RemoveFileReached.selector, LibFs.pathForContract(name)),
+            "a symlink resolving to nothing was not removed by the cheatcode"
+        );
+    }
+
+    /// The entry that decides this is the one named for the generated path, not
+    /// whichever the listing happens to report first. A directory holds every
+    /// other generated file too, and a consumer's holds whatever else it holds,
+    /// so a sibling being a symlink says nothing about this path.
+    function testBuildFileForContractMatchesTheEntryByName() external {
+        string memory name = "LibFsBuildRemovalSibling";
+        VmSafe.DirEntry[] memory entries = new VmSafe.DirEntry[](3);
+        entries[0] = entryNamed("LibFsBuildRemovalSiblingBefore", true);
+        entries[1] = entryNamed(name, false);
+        entries[2] = entryNamed("LibFsBuildRemovalSiblingAfter", true);
+
+        bytes memory reason = removalOutcome(name, entries, true, 0, "");
+
+        assertEq(
+            reason,
+            abi.encodeWithSelector(RemoveFileReached.selector, LibFs.pathForContract(name)),
+            "the listing was matched on something other than the name"
+        );
+    }
+
+    /// A listing that names nothing at the path is the same answer as a listing
+    /// that names it and says it is not a symlink: the cheatcode removes it.
+    /// Nothing else can be assumed from an absence, and assuming a link would
+    /// shell out for every path.
+    function testBuildFileForContractRemovesWithTheCheatcodeWhenTheListingIsEmpty() external {
+        string memory name = "LibFsBuildRemovalUnlisted";
+        VmSafe.DirEntry[] memory entries = new VmSafe.DirEntry[](0);
+
+        bytes memory reason = removalOutcome(name, entries, true, 0, "");
+
+        assertEq(
+            reason,
+            abi.encodeWithSelector(RemoveFileReached.selector, LibFs.pathForContract(name)),
+            "a path the listing does not name was not removed by the cheatcode"
+        );
     }
 
     /// A consumer holds the artifact this library used to write committed and

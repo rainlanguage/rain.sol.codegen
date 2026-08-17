@@ -3,7 +3,7 @@
 pragma solidity ^0.8.25;
 
 /// @title IParserToolingV1
-/// Implemented by any contract that exposes parser tooling functions for the
+/// @notice Implemented by any contract that exposes parser tooling functions for the
 /// Rain interpreter. Ostensibly this is for the interpreter itself while sub
 /// parsers have a separate interface.
 interface IParserToolingV1 {
@@ -13,9 +13,17 @@ interface IParserToolingV1 {
     /// will be built ahead of time and cached in a constant for efficiency. As
     /// the process is deterministic for a given source and compiler
     /// configuration, the output can be tested against the used value in CI and
-    /// the translation from source to pointers can also be tested in CI. See
-    /// .github/workflows/build-pointers.yaml for an example of such a test.
-    function buildOperandHandlerFunctionPointers() external pure returns (bytes memory);
+    /// the translation from source to pointers can also be tested in CI.
+    /// rainix's `rainix-copy-artifacts.yaml` reusable workflow is that test: it
+    /// regenerates from the consumer's `script/Build.sol` and fails on any diff
+    /// against the committed sources. Worked example of the generation side:
+    /// https://github.com/rainlanguage/rain.deploy/blob/main/script/Build.sol
+    /// Declared `view` so an implementation may read storage or an immutable to
+    /// build its answer. A `pure` implementation still conforms, as an override
+    /// may only tighten mutability.
+    /// @return Every two bytes is a function pointer for an operand handler,
+    /// positionally indexed to match the parse meta.
+    function buildOperandHandlerFunctionPointers() external view returns (bytes memory);
 
     /// Builds literal parser function pointers.
     /// This is intended for use by the Rain interpreter to run literal parsing
@@ -23,7 +31,15 @@ interface IParserToolingV1 {
     /// will be built ahead of time and cached in a constant for efficiency. As
     /// the process is deterministic for a given source and compiler
     /// configuration, the output can be tested against the used value in CI and
-    /// the translation from source to pointers can also be tested in CI. See
-    /// .github/workflows/build-pointers.yaml for an example of such a test.
-    function buildLiteralParserFunctionPointers() external pure returns (bytes memory);
+    /// the translation from source to pointers can also be tested in CI.
+    /// rainix's `rainix-copy-artifacts.yaml` reusable workflow is that test: it
+    /// regenerates from the consumer's `script/Build.sol` and fails on any diff
+    /// against the committed sources. Worked example of the generation side:
+    /// https://github.com/rainlanguage/rain.deploy/blob/main/script/Build.sol
+    /// Declared `view` so an implementation may read storage or an immutable to
+    /// build its answer. A `pure` implementation still conforms, as an override
+    /// may only tighten mutability.
+    /// @return Every two bytes is a function pointer for a literal parser,
+    /// dispatched on the first byte(s) of the literal.
+    function buildLiteralParserFunctionPointers() external view returns (bytes memory);
 }

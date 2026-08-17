@@ -244,6 +244,31 @@ contract LibFsBuildFileForContractTest is Test {
         }
     }
 
+    /// The directory is created when it is not there, so a repo generating for
+    /// the first time does not have to commit it. Two levels of it are missing,
+    /// so a create that did not also make the missing parent fails here.
+    ///
+    /// Driven through a directory this test owns rather than through
+    /// `GENERATED_DIR` itself. Every generating test in this file writes under
+    /// `GENERATED_DIR` and `forge` runs them in parallel, so removing it to
+    /// make it missing races all of them. `setUp` above creates `GENERATED_DIR`
+    /// for exactly that reason, which is also what makes the library's own
+    /// create unreachable from any test that writes there directly.
+    function testBuildFileForContractCreatesTheDirectory() external {
+        string memory root = string.concat(GENERATED_DIR, "/LibFsBuildCreatesDir");
+        string memory dir = string.concat(root, "/nested");
+        string memory name = "LibFsBuildCreatesDir";
+        cleanupPath(root);
+        assertFalse(vm.exists(root), "dirty precondition");
+        address instance = address(new CodeGennable());
+        string memory body = "\n// created\n";
+
+        LibFs.buildFileForContract(vm, instance, dir, name, body);
+
+        assertEq(vm.readFile(string.concat(dir, "/", name, ".sol")), expectedFile(instance, body));
+        cleanupPath(root);
+    }
+
     /// A name that is not a Solidity identifier gets no path from
     /// `pathForContract`, and `buildFileForContract` asks for the path before it
     /// reaches a cheatcode, so the refusal arrives before anything is written.

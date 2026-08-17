@@ -4,8 +4,8 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibCodeGen, MAX_LINE_LENGTH, CodelessInstance} from "src/lib/LibCodeGen.sol";
-import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
-import {CodeGennable} from "../concrete/CodeGennable.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
+import {CodeGennable} from "test/concrete/CodeGennable.sol";
 
 /// @title LibCodeGenBytecodeHashConstantStringTest
 /// @notice `bytecodeHashConstantString` emits the one constant that every

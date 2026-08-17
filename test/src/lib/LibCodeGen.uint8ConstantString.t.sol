@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
-import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @title LibCodeGenUint8ConstantStringTest
 /// @notice `uint8ConstantString` emits a Solidity `uint8 constant` declaration
@@ -88,14 +88,14 @@ contract LibCodeGenUint8ConstantStringTest is Test {
         );
     }
 
-    /// The emitted literal parses back to the value it was generated from, so
-    /// the constant is not silently truncated or reformatted.
+    /// The literal the declaration carries parses back to the value it was
+    /// generated from, so the constant is not silently truncated or
+    /// reformatted. The literal is sliced out of the emitted text, so the round
+    /// trip is a property of what the library wrote.
     function testUint8ConstantStringRoundTrips(uint8 data) external pure {
-        assertEq(
-            LibCodeGen.uint8ConstantString(vm, "/// @dev Fuzz.", "FUZZ", data),
-            string.concat("\n/// @dev Fuzz.\nuint8 constant FUZZ = ", vm.toString(uint256(data)), ";\n")
-        );
-        assertEq(vm.parseUint(vm.toString(uint256(data))), uint256(data));
+        string memory emitted = LibCodeGen.uint8ConstantString(vm, "/// @dev Fuzz.", "FUZZ", data);
+        assertEq(emitted, string.concat("\n/// @dev Fuzz.\nuint8 constant FUZZ = ", vm.toString(uint256(data)), ";\n"));
+        assertEq(vm.parseUint(LibCodeGenSlow.betweenSlow(emitted, "FUZZ = ", ";")), uint256(data));
     }
 
     /// An empty comment emits no comment line rather than an empty one. Two

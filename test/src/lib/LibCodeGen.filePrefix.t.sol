@@ -40,25 +40,17 @@ contract LibCodeGenFilePrefixTest is Test {
         return string(text);
     }
 
-    /// The prefix must not name the script that generates the file. Each
-    /// consumer names its own build script, so any script path here is a claim
-    /// this library cannot keep. Asserted as "names no Solidity file at all"
-    /// because the constraint is that no script is named, not that some
-    /// particular name is absent.
-    function testFilePrefixNamesNoScript() external pure {
-        assertFalse(
-            vm.contains(
-                LibCodeGen.filePrefix("LicenseRef-DCL-1.0", "Copyright (c) 2020 Rain Open Source Software Ltd"), ".sol"
-            ),
-            "prefix names a script"
-        );
-    }
-
-    /// The prefix heads every generated file in every consumer repo, so a change
-    /// to the part of it this library owns rewrites committed files org wide.
-    /// Pinned exactly, with this repo's own licence and copyright as the
+    /// The prefix heads every generated file in every consumer repo, so a
+    /// change to the part of it this library owns rewrites committed files org
+    /// wide. Pinned exactly, with this repo's own licence and copyright as the
     /// caller's values, so that lands as a deliberate, reviewable diff rather
     /// than a surprise on the next regeneration.
+    ///
+    /// The pinned text names no script. Each consumer names its own build
+    /// script, so a script path in the prefix would be a claim this library
+    /// cannot keep. Exactly one string passes here, so every string that
+    /// names a `.sol` file fails, and pinning the whole prefix is what
+    /// refuses them.
     function testFilePrefixExact() external pure {
         assertEq(
             LibCodeGen.filePrefix("LicenseRef-DCL-1.0", "Copyright (c) 2020 Rain Open Source Software Ltd"),

@@ -21,5 +21,7 @@ interface IOpcodeToolingV1 {
     /// Declared `view` so an implementation may read storage or an immutable to
     /// build its answer. A `pure` implementation still conforms, as an override
     /// may only tighten mutability.
+    /// @return Every two bytes is a function pointer for an opcode
+    /// implementation, positionally indexed by opcode.
     function buildOpcodeFunctionPointers() external view returns (bytes memory);
 }

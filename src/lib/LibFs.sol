@@ -119,8 +119,14 @@ library LibFs {
     /// writes to is `GENERATED_DIR`, and `dir` is interpolated verbatim and is
     /// not checked.
     ///
-    /// `dir` must exist and be readable under `fs_permissions`, because the
-    /// whole check is one read of it. Callers create it first.
+    /// The whole check is one read of `dir`, and `vm.readDir` does not revert
+    /// when that read fails: it returns a single entry naming `dir` itself and
+    /// carrying an `errorMessage`. No artifact name matches that entry, so a
+    /// directory that cannot be read is accepted rather than refused. That is
+    /// the answer wanted for a repo with no generated directory yet, and it is
+    /// why `buildFileForContract` creates `dir` before calling this: after a
+    /// `vm.createDir` that did not itself revert, the read is of a directory
+    /// that is there.
     /// @param vm The Vm instance for file operations.
     /// @param dir The directory to read, without a trailing separator,
     /// interpolated verbatim.

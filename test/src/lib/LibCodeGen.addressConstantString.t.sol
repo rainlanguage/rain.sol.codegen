@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
-import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @dev A checksummed address literal, 42 characters like every other, so the
 /// declaration is `72 + name.length` characters long on one line.

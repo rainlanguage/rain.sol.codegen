@@ -468,7 +468,11 @@ contract LibHexStringBytesToHexTest is Test {
     /// an unconstructed return conforms 0 times in 2048 runs. `conforming`
     /// picks which half of the property a run aims at, and the payload is
     /// filled from `filler` so that an accepted string is arbitrary in
-    /// everything except the length and prefix the library actually checks.
+    /// everything except the shape the library actually checks. That shape
+    /// includes the hexadecimal charset, which an arbitrary `filler` almost
+    /// never satisfies, so a constructed payload still lands in the rejected
+    /// half most of the time: the accepted half is reached on the order of 55
+    /// runs in 2048 rather than on the order of 1024.
     /// Whether a string conforms is still read off its own characters below, so
     /// a `filler` that happens to conform is checked against the accepted half
     /// rather than expected to revert.

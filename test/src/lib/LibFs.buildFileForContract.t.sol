@@ -583,4 +583,30 @@ contract LibFsBuildFileForContractTest is Test {
             string.concat("not refused as OrphanedGeneratedArtifact(", dirOrphan, ")")
         );
     }
+
+    /// The check reads what is inside the directory, never the directory's own
+    /// name, and it reads it after `vm.createDir` rather than before.
+    ///
+    /// `vm.readDir` does not revert on a directory that is not there: it
+    /// returns one entry whose `path` is that directory and whose
+    /// `errorMessage` says why. A check placed ahead of the create therefore
+    /// reads that one entry, and for a directory whose own final segment reads
+    /// as an artifact for the contract it refuses the very first generation —
+    /// naming, as the orphan, the directory it was about to create. Driven
+    /// through such a directory, because that is the only shape the two
+    /// orderings disagree on.
+    function testBuildFileForContractReadsTheDirectoryNotItsOwnName() external {
+        string memory name = "LibFsBuildDirName";
+        string memory dir = string.concat(GENERATED_DIR, "/", name, ".snapshot");
+        cleanupPath(dir);
+        assertFalse(vm.exists(dir), "dirty precondition");
+        address instance = address(new CodeGennable());
+        string memory body = "\n// dir name\n";
+
+        LibFs.buildFileForContract(vm, instance, dir, name, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body);
+
+        string memory written = vm.readFile(string.concat(dir, "/", name, ".sol"));
+        cleanupPath(dir);
+        assertEq(written, expectedFile(instance, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body));
+    }
 }

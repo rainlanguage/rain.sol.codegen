@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
-import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, MAX_LINE_LENGTH, InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @dev A `bytes32` literal is 66 characters whatever the value, so the
@@ -16,6 +16,16 @@ string constant SOME_HASH_STRING = "0x2573004ac3a9ee7fc8d73654d76386f1b6b99e34cd
 /// declaration. The output is source code that must COMPILE, so these assert the
 /// exact emitted text rather than that it merely contains the value.
 contract LibCodeGenBytes32ConstantStringTest is Test {
+    /// Reachable only through an external call so that a rejected name reverts
+    /// the call rather than aborting the test.
+    function callBytes32ConstantString(string memory comment, string memory name, bytes32 data)
+        external
+        pure
+        returns (string memory)
+    {
+        return LibCodeGen.bytes32ConstantString(vm, comment, name, data);
+    }
+
     function testBytes32ConstantString() external view {
         assertEq(
             LibCodeGen.bytes32ConstantString(
@@ -80,14 +90,46 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
     /// built from those literals, wrapped exactly when measuring the one line
     /// form says it does not fit. Fuzzed over every input because each term of
     /// the library's hand computed sum has to be right for this to hold.
-    function testBytes32ConstantStringMatchesMeasuredLine(string memory comment, string memory name, bytes32 data)
+    /// The name is built from the seed rather than fuzzed directly because
+    /// random bytes are essentially never an identifier, and a name that is not
+    /// one is rejected before anything is emitted at all.
+    function testBytes32ConstantStringMatchesMeasuredLine(string memory comment, bytes memory seed, bytes32 data)
         external
         view
     {
+        string memory name = LibCodeGenSlow.nameFromSeedSlow(seed);
         assertEq(
             LibCodeGen.bytes32ConstantString(vm, comment, name, data),
             LibCodeGenSlow.bytes32ConstantStringSlow(vm, comment, name, data)
         );
+    }
+
+    /// The name is interpolated verbatim into a `bytes32 constant` declaration,
+    /// so a name that is not a Solidity identifier is refused rather than
+    /// emitted. A space or a `-` produces a file that does not compile, and a
+    /// `;` one that compiles into a different set of declarations than the
+    /// caller asked for.
+    function testBytes32ConstantStringRejectsNonIdentifierName() external {
+        string[5] memory names = ["SOME NAME", "SOME;NAME", "SOME-NAME", "", "0LEADING"];
+        for (uint256 i = 0; i < names.length; i++) {
+            vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, names[i]));
+            this.callBytes32ConstantString("/// @dev Bad name.", names[i], SOME_HASH);
+        }
+    }
+
+    /// The set of names that emit is exactly the set of Solidity identifiers.
+    /// Stated against the reference alphabet so that neither a check that
+    /// rejects too much nor one that rejects nothing at all passes.
+    function testBytes32ConstantStringNameMustBeIdentifier(string memory name, bytes32 data) external {
+        if (LibCodeGenSlow.isIdentifierSlow(name)) {
+            assertEq(
+                this.callBytes32ConstantString("/// @dev Fuzz.", name, data),
+                LibCodeGenSlow.bytes32ConstantStringSlow(vm, "/// @dev Fuzz.", name, data)
+            );
+        } else {
+            vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, name));
+            this.callBytes32ConstantString("/// @dev Fuzz.", name, data);
+        }
     }
 
     /// An empty comment emits no comment line rather than an empty one. Two

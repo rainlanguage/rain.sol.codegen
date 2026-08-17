@@ -17,10 +17,10 @@ uint256 constant MAX_LINE_LENGTH = 120;
 /// needs to match what formatters expect.
 string constant NEWLINE_DUE_TO_MAX_LENGTH = "\n    ";
 
-/// Thrown when a contract name is not a Solidity identifier. Such a name cannot
-/// be interpolated into a file path or a constant declaration.
+/// Thrown when a name is not a Solidity identifier. Such a name cannot be
+/// interpolated into a file path or a constant declaration.
 /// @param name The rejected name.
-error InvalidContractName(string name);
+error InvalidIdentifier(string name);
 
 /// Thrown when a bytecode hash is asked for at an address that holds no code.
 /// @param instance The address that holds no code.
@@ -46,14 +46,19 @@ error InvalidCopyrightText(string copyrightText);
 library LibCodeGen {
     /// Reverts unless `name` is a Solidity identifier: at least one character,
     /// drawn from ASCII letters, digits, `_` and `$`, and not starting with a
-    /// digit. A contract name is such an identifier, and restricting it to one
-    /// is also what makes it safe to interpolate into a path: no identifier
-    /// contains a path separator, and none of them is `.` or `..`.
+    /// digit. Every name this library interpolates verbatim into generated
+    /// source or into a path is one, and being an identifier is what makes that
+    /// interpolation safe. A declaration named by an identifier is the
+    /// declaration the caller asked for and no other, because no identifier
+    /// carries a space, a `;` or any other character that ends a declaration or
+    /// starts another. A path built from an identifier stays a direct child of
+    /// the directory it is joined to, because no identifier contains a path
+    /// separator and none of them is `.` or `..`.
     /// @param name The name to check.
-    function requireContractName(string memory name) internal pure {
+    function requireIdentifier(string memory name) internal pure {
         bytes memory nameBytes = bytes(name);
         if (nameBytes.length == 0) {
-            revert InvalidContractName(name);
+            revert InvalidIdentifier(name);
         }
         for (uint256 i = 0; i < nameBytes.length; i++) {
             bytes1 char = nameBytes[i];
@@ -61,7 +66,7 @@ library LibCodeGen {
             bool isDigit = char >= 0x30 && char <= 0x39;
             bool isUnderscoreOrDollar = char == 0x5F || char == 0x24;
             if (!(isLetter || isUnderscoreOrDollar || (isDigit && i > 0))) {
-                revert InvalidContractName(name);
+                revert InvalidIdentifier(name);
             }
         }
     }
@@ -307,7 +312,7 @@ library LibCodeGen {
     /// @return A string containing the Solidity code for the described by meta
     /// hash constant.
     function describedByMetaHashConstantString(Vm vm, string memory name) internal view returns (string memory) {
-        requireContractName(name);
+        requireIdentifier(name);
         bytes memory describedByMeta = vm.readFileBinary(string.concat("meta/", name, ".rain.meta"));
         return bytes32ConstantString(
             vm,
@@ -323,7 +328,8 @@ library LibCodeGen {
     /// @param vm The Vm instance used to format values as strings.
     /// @param comment The comment to include above the constant declaration.
     /// An empty comment emits no comment line.
-    /// @param name The name of the constant.
+    /// @param name The name of the constant, interpolated verbatim. Has to be a
+    /// Solidity identifier.
     /// @param data The bytes data for the constant.
     /// @return A string containing the Solidity code for the bytes constant.
     function bytesConstantString(Vm vm, string memory comment, string memory name, bytes memory data)
@@ -331,6 +337,7 @@ library LibCodeGen {
         pure
         returns (string memory)
     {
+        requireIdentifier(name);
         string memory hexData = LibHexString.bytesToHex(vm, data);
         return string.concat(
             commentPrefix(comment),
@@ -351,7 +358,8 @@ library LibCodeGen {
     /// @param vm The Vm instance used to format values as strings.
     /// @param comment The comment to include above the constant declaration.
     /// An empty comment emits no comment line.
-    /// @param name The name of the constant.
+    /// @param name The name of the constant, interpolated verbatim. Has to be a
+    /// Solidity identifier.
     /// @param data The uint8 data for the constant.
     /// @return A string containing the Solidity code for the uint8 constant.
     function uint8ConstantString(Vm vm, string memory comment, string memory name, uint8 data)
@@ -359,6 +367,7 @@ library LibCodeGen {
         pure
         returns (string memory)
     {
+        requireIdentifier(name);
         string memory intString = vm.toString(data);
         return string.concat(
             commentPrefix(comment),
@@ -379,7 +388,8 @@ library LibCodeGen {
     /// @param vm The Vm instance used to format values as strings.
     /// @param comment The comment to include above the constant declaration.
     /// An empty comment emits no comment line.
-    /// @param name The name of the constant.
+    /// @param name The name of the constant, interpolated verbatim. Has to be a
+    /// Solidity identifier.
     /// @param data The bytes32 value for the constant.
     /// @return A string containing the Solidity code for the bytes32 constant.
     function bytes32ConstantString(Vm vm, string memory comment, string memory name, bytes32 data)
@@ -387,6 +397,7 @@ library LibCodeGen {
         pure
         returns (string memory)
     {
+        requireIdentifier(name);
         string memory hexString = vm.toString(data);
         return string.concat(
             commentPrefix(comment),
@@ -408,7 +419,8 @@ library LibCodeGen {
     /// @param vm The Vm instance used to format values as strings.
     /// @param comment The comment to include above the constant declaration.
     /// An empty comment emits no comment line.
-    /// @param name The name of the constant.
+    /// @param name The name of the constant, interpolated verbatim. Has to be a
+    /// Solidity identifier.
     /// @param data The address for the constant.
     /// @return A string containing the Solidity code for the address constant.
     function addressConstantString(Vm vm, string memory comment, string memory name, address data)
@@ -416,6 +428,7 @@ library LibCodeGen {
         pure
         returns (string memory)
     {
+        requireIdentifier(name);
         string memory addressString = vm.toString(data);
         return string.concat(
             commentPrefix(comment),

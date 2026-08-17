@@ -51,7 +51,7 @@ library LibFs {
     /// @param contractName The name of the contract, interpolated verbatim.
     /// @return The file path as a string.
     function pathForContractIn(string memory dir, string memory contractName) private pure returns (string memory) {
-        LibCodeGen.requireContractName(contractName);
+        LibCodeGen.requireIdentifier(contractName);
         return string.concat(dir, "/", contractName, ".sol");
     }
 
@@ -98,12 +98,18 @@ library LibFs {
     /// nothing is created, unlinked or written unless there is content to
     /// write.
     ///
-    /// Anything already at the path is unlinked before the write, so a symlink
+    /// The path is unlinked until it holds nothing, then written, so a symlink
     /// there is replaced by a regular file rather than written through to its
-    /// target, including a symlink whose target does not exist, and the path
-    /// does not exist between the unlink and the write.
-    /// Any manual changes to the generated file, or any other existing file at
-    /// that path, are lost.
+    /// target, whether or not that target exists, and the path does not exist
+    /// between the last unlink and the write. Taking a live symlink off the
+    /// path takes what it resolves to with it, because that is what the unlink
+    /// acts on first.
+    /// Any manual changes to the generated file, any other existing file at
+    /// that path, and whatever a symlink at that path resolves to, are lost.
+    ///
+    /// A directory at the path, and a symlink at the path that resolves to a
+    /// directory, are the cases this cannot unlink, and both revert rather than
+    /// being written into or through.
     ///
     /// The whole file is written on every call, so the same arguments always
     /// produce the same bytes. The prefix and bytecode hash constant are always
@@ -173,7 +179,11 @@ library LibFs {
         );
         //forge-lint: disable-next-line(unsafe-cheatcode)
         vm.createDir(dir, true);
-        if (isPresent(vm, path)) {
+        // `vm.removeFile` resolves the path before it acts, so on a live symlink
+        // it takes what the link points at and leaves the link, now dangling.
+        // Every pass removes something the next one no longer finds, so this
+        // ends with the path holding nothing.
+        while (isPresent(vm, path)) {
             //forge-lint: disable-next-line(unsafe-cheatcode)
             vm.removeFile(path);
         }

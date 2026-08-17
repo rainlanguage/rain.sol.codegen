@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
 import {LibCodeGen, MAX_LINE_LENGTH, InvalidContractName} from "src/lib/LibCodeGen.sol";
-import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @dev `describedByMetaHashConstantString` reads `meta/<name>.rain.meta`, and
 /// this repo's `fs_permissions` grants read-write on `meta`, so a fixture goes

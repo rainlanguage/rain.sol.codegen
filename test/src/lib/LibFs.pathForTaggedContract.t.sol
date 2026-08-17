@@ -45,17 +45,6 @@ contract LibFsPathForTaggedContractTest is Test {
         iExternal.pathForContract("0_1_1/StoxReceipt");
     }
 
-    /// Copies `len` bytes out of `data` starting at `start`. Used so the
-    /// structural assertions below can name each of the four regions of the path
-    /// independently, rather than rebuilding the path with the same
-    /// `string.concat` the library uses and asserting it equals itself.
-    function slice(bytes memory data, uint256 start, uint256 len) internal pure returns (bytes memory out) {
-        out = new bytes(len);
-        for (uint256 i = 0; i < len; i++) {
-            out[i] = data[start + i];
-        }
-    }
-
     /// The path is four regions and nothing else: the generated directory, the
     /// tag byte for byte, a separator then the contract name byte for byte, and
     /// the Solidity extension. Asserted positionally over arguments built from
@@ -71,11 +60,15 @@ contract LibFsPathForTaggedContractTest is Test {
         bytes memory nameBytes = bytes(contractName);
 
         assertEq(path.length, 14 + tagBytes.length + 1 + nameBytes.length + 4, "path has bytes beyond its four regions");
-        assertEq(slice(path, 0, 14), bytes("src/generated/"), "generated directory");
-        assertEq(slice(path, 14, tagBytes.length), tagBytes, "tag is not verbatim");
-        assertEq(slice(path, 14 + tagBytes.length, 1), bytes("/"), "tag separator");
-        assertEq(slice(path, 15 + tagBytes.length, nameBytes.length), nameBytes, "contract name is not verbatim");
-        assertEq(slice(path, 15 + tagBytes.length + nameBytes.length, 4), bytes(".sol"), "extension");
+        assertEq(LibCodeGenSlow.sliceSlow(path, 0, 14), bytes("src/generated/"), "generated directory");
+        assertEq(LibCodeGenSlow.sliceSlow(path, 14, tagBytes.length), tagBytes, "tag is not verbatim");
+        assertEq(LibCodeGenSlow.sliceSlow(path, 14 + tagBytes.length, 1), bytes("/"), "tag separator");
+        assertEq(
+            LibCodeGenSlow.sliceSlow(path, 15 + tagBytes.length, nameBytes.length),
+            nameBytes,
+            "contract name is not verbatim"
+        );
+        assertEq(LibCodeGenSlow.sliceSlow(path, 15 + tagBytes.length + nameBytes.length, 4), bytes(".sol"), "extension");
     }
 
     /// The path is relative to the project root. An absolute path would resolve

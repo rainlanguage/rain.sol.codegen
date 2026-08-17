@@ -185,6 +185,17 @@ library LibCodeGenSlow {
         return haystack.length;
     }
 
+    /// Copies `len` bytes out of `data` starting at `start`, so a test can name
+    /// each region of a constructed path independently rather than rebuilding
+    /// it with the same `string.concat` the library uses and asserting it
+    /// equals itself.
+    function sliceSlow(bytes memory data, uint256 start, uint256 len) internal pure returns (bytes memory out) {
+        out = new bytes(len);
+        for (uint256 i = 0; i < len; i++) {
+            out[i] = data[start + i];
+        }
+    }
+
     /// The text between the first `open` in `text` and the first `close` after
     /// it, so a test can state a property of the literal a declaration carries
     /// rather than of a value the test formatted for itself. Reverts when

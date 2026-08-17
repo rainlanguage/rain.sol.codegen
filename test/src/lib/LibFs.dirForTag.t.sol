@@ -37,17 +37,6 @@ contract LibFsDirForTagTest is Test {
         assertEq(LibFs.dirForTag("candidate"), "src/generated/candidate");
     }
 
-    /// Copies `len` bytes out of `data` starting at `start`, so the structural
-    /// assertions below can name each region of the directory independently
-    /// rather than rebuilding it with the same `string.concat` the library uses
-    /// and asserting it equals itself.
-    function slice(bytes memory data, uint256 start, uint256 len) internal pure returns (bytes memory out) {
-        out = new bytes(len);
-        for (uint256 i = 0; i < len; i++) {
-            out[i] = data[start + i];
-        }
-    }
-
     /// The directory is two regions and nothing else: the generated directory
     /// and the tag byte for byte. Asserted positionally over tags built from
     /// the alphabet, at every length, so that a tag is never quoted, escaped,
@@ -60,8 +49,8 @@ contract LibFsDirForTagTest is Test {
         bytes memory tagBytes = bytes(tag);
 
         assertEq(dir.length, 14 + tagBytes.length, "directory has bytes beyond generated dir + tag");
-        assertEq(slice(dir, 0, 14), bytes("src/generated/"), "generated directory");
-        assertEq(slice(dir, 14, tagBytes.length), tagBytes, "tag is not verbatim");
+        assertEq(LibCodeGenSlow.sliceSlow(dir, 0, 14), bytes("src/generated/"), "generated directory");
+        assertEq(LibCodeGenSlow.sliceSlow(dir, 14, tagBytes.length), tagBytes, "tag is not verbatim");
     }
 
     /// Two tags must never be handed the same directory: a frozen snapshot

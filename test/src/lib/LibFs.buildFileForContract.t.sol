@@ -4,7 +4,12 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
-import {InvalidContractName, InvalidSpdxLicenseIdentifier, InvalidCopyrightText} from "src/lib/LibCodeGen.sol";
+import {
+    InvalidContractName,
+    InvalidSpdxLicenseIdentifier,
+    InvalidCopyrightText,
+    CodelessInstance
+} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
@@ -342,6 +347,29 @@ contract LibFsBuildFileForContractTest is Test {
             "a copyright carrying a line break was not refused"
         );
         assertFalse(written, "a refused header still wrote a file");
+    }
+
+    /// Generating the content can revert: a codeless instance has no bytecode
+    /// hash to name. The content is built before anything on disk is touched,
+    /// so a build that fails leaves the file it was about to replace exactly as
+    /// it found it. Cheatcode filesystem effects are not rolled back by the
+    /// revert, so an unlink that ran ahead of the failure would be permanent
+    /// and the visible symptom would be a missing generated artifact rather
+    /// than the `CodelessInstance` that caused it.
+    function testBuildFileForContractFailedBuildKeepsExistingFile() external {
+        string memory name = "LibFsBuildFailedKeeps";
+        address codeless = address(uint160(0xdead));
+        assertEq(codeless.code.length, 0, "instance must hold no code");
+        string memory path = LibFs.pathForContract(name);
+        cleanup(name);
+        vm.writeFile(path, "PRE-EXISTING");
+
+        vm.expectRevert(abi.encodeWithSelector(CodelessInstance.selector, codeless));
+        iExternal.buildFileForContract(vm, codeless, name, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, "\n// body\n");
+
+        assertTrue(vm.exists(path), "a failed build destroyed the existing file");
+        assertEq(vm.readFile(path), "PRE-EXISTING", "a failed build rewrote the existing file");
+        cleanup(name);
     }
 
     /// Removes whatever is at `path`, so that a test asserting nothing was

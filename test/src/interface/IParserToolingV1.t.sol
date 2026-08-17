@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {IParserToolingV1} from "src/interface/IParserToolingV1.sol";
 import {ToolingMock} from "test/concrete/ToolingMock.sol";
 

@@ -9,11 +9,17 @@ Also exposes the tooling interfaces (`IIntegrityToolingV1`, `IOpcodeToolingV1`,
 `IParserToolingV1`, `ISubParserToolingV1`) that Rain contracts implement to
 build the pointers this library caches.
 
-`script/Build.sol` is an example implementation. The name is not a free choice:
-rainix's `rainix-copy-artifacts.yaml` reusable regenerates from that exact path,
-and hard-fails any repo that commits `src/generated/` without it.
-`.github/workflows/build-pointers.yaml` wires that reusable up here, so CI fails
-when the committed generated sources drift from a fresh regeneration.
+A consumer drives this library from a build script, and the path of that script
+is not a free choice: rainix's `rainix-copy-artifacts.yaml` reusable regenerates
+from `script/Build.sol` exactly, and hard-fails any repo that commits
+`src/generated/` without one. A consumer that names its script anything else
+gets no regeneration and no currency check.
+
+The org's worked example is
+[`rainlanguage/rain.deploy`](https://github.com/rainlanguage/rain.deploy):
+[`script/Build.sol`](https://github.com/rainlanguage/rain.deploy/blob/main/script/Build.sol)
+generates into its committed `src/generated/`. This repo carries no example of
+its own — it is the library, and nothing here is generated.
 
 Generated code is imported downstream by contracts that themselves expose
 pointers, which pointers feed back into the generation. This cycle means
@@ -29,6 +35,19 @@ fix: the cycle itself does not settle, so regenerating again never produces a
 tree worth committing. Committing whichever pass happens to diff clean is what
 the bound exists to stop — it records a `BYTECODE_HASH` for a contract compiled
 against a different pass of the same file.
+
+## Formatter requirements
+
+`LibCodeGen` wraps the declarations it emits itself, deciding against
+`MAX_LINE_LENGTH` and `NEWLINE_DUE_TO_MAX_LENGTH`. Those two encode
+`forge fmt`'s `line_length` and `tab_width`, which this repo states in `[fmt]`
+of `foundry.toml` rather than inheriting.
+
+A consuming repo whose `[fmt]` disagrees gets generated sources its own
+`forge fmt` reflows. `rainix-copy-artifacts` regenerates, runs `forge fmt`, then
+`git diff --exit-code`, so that reflow is committed as the new baseline instead
+of being reported. Consumers therefore need `line_length = 120` and
+`tab_width = 4`.
 
 ## Install
 
@@ -56,17 +75,11 @@ Checks, each of which CI also runs:
 - `slither .`
 - `reuse lint`
 
-Regenerate the committed example artifact under `src/generated/`:
-
-```sh
-forge script script/Build.sol
-```
-
-One run settles it here: `CodeGennable` imports nothing from `src/generated/`,
-so its codehash does not move when the file recording it is rewritten. A
-consumer whose contracts import what they generate has no such guarantee, and
-locally has only `git status` to tell it that a run changed nothing — repeat
-until it does.
+`forge test` writes scratch files under `src/generated/`, creating the directory
+if it is absent. Nothing there is committed, and every test removes its own
+file, so a completed run leaves the directory empty and invisible to git. Same
+arrangement as `meta/`, which the meta-hash tests use the same way. Anything
+left there after an interrupted run is scratch, and `git status` will say so.
 
 On top of the above, CI applies rainix's org-wide static checks via
 [`.github/workflows/rainix.yaml`](.github/workflows/rainix.yaml).

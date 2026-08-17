@@ -37,6 +37,28 @@ read a tree that never stops changing as a cycle that does not converge rather
 than one more pass to run. Committing part-way records a deployed-bytecode hash
 for a contract compiled against a different pass of the same file.
 
+## Generated paths
+
+`LibFs.pathForContract` names `src/generated/<Contract>.sol`, and
+`buildFileForContract` writes that file and only that file. Consumers commit it
+and import it by path from `src/**`, so the path is a cross repo contract:
+moving it, or moving `GENERATED_DIR`, breaks every repo holding the artifact at
+the old path.
+
+`buildFileForContract` therefore refuses to generate while `src/generated/`
+holds another artifact for the same contract — any direct child named for that
+contract, in full, followed by a `.` and anything other than `sol`. Nothing
+regenerates such a file, while the consumer's imports keep resolving to it, so
+the build fails with `OrphanedGeneratedArtifact` naming the file rather than
+generating beside it. Delete it and repoint the imports at
+`src/generated/<Contract>.sol` in the same commit.
+
+Only direct children are read, so a generation into `src/generated/` never reads
+inside the per release snapshot directories that sit there, and never refuses
+one of them either, because a tag carries no `.`. `buildFileForTaggedContract`
+writes into one of those directories, and reads that directory rather than
+`src/generated/`, so each is checked against its own contents.
+
 ## Formatter requirements
 
 `LibCodeGen` wraps the declarations it emits itself, deciding against

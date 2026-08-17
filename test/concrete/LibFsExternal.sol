@@ -20,8 +20,24 @@ contract LibFsExternal {
         LibFs.buildFileForContract(vm, instance, contractName, spdxLicenseIdentifier, copyrightText, body);
     }
 
+    function buildFileForContract(
+        Vm vm,
+        address instance,
+        string memory dir,
+        string memory contractName,
+        string memory spdxLicenseIdentifier,
+        string memory copyrightText,
+        string memory body
+    ) external {
+        LibFs.buildFileForContract(vm, instance, dir, contractName, spdxLicenseIdentifier, copyrightText, body);
+    }
+
     function pathForContract(string memory contractName) external pure returns (string memory) {
         return LibFs.pathForContract(contractName);
+    }
+
+    function requireNoOrphanedArtifact(Vm vm, string memory contractName) external view {
+        LibFs.requireNoOrphanedArtifact(vm, contractName);
     }
 
     function buildFileForTaggedContract(

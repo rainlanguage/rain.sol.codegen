@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {Vm, VmSafe} from "forge-std-1.16.2/src/Vm.sol";
-import {LibFs, GENERATED_DIR, SymlinkRemovalFailed} from "src/lib/LibFs.sol";
+import {LibFs, GENERATED_DIR, SymlinkRemovalFailed, OrphanedGeneratedArtifact} from "src/lib/LibFs.sol";
 import {
     InvalidIdentifier,
     InvalidSpdxLicenseIdentifier,
@@ -623,5 +623,148 @@ contract LibFsBuildFileForContractTest is Test {
             abi.encodeWithSelector(RemoveFileReached.selector, LibFs.pathForContract(name)),
             "a path the listing does not name was not removed by the cheatcode"
         );
+    }
+
+    /// A consumer holds the artifact this library used to write committed and
+    /// imported from `src/**`. Generating beside it would leave those imports
+    /// resolving to a file nothing regenerates, with the build reporting
+    /// success, so the generation is refused instead and nothing is written.
+    ///
+    /// The refusal lands before the unlink as well as before the write, which
+    /// is what the pre-existing file at the generated path pins: a check placed
+    /// after the unlink would leave a consumer with neither artifact.
+    function testBuildFileForContractRefusesToOrphanAnotherArtifact() external {
+        string memory name = "LibFsBuildOrphan";
+        string memory orphan = string.concat(GENERATED_DIR, "/", name, ".pointers.sol");
+        //REUSE-IgnoreStart
+        string memory existing = "// SPDX-License-Identifier: LicenseRef-DCL-1.0\npragma solidity ^0.8.25;\n";
+        //REUSE-IgnoreEnd
+        cleanupPath(orphan);
+        cleanup(name);
+        vm.writeFile(orphan, existing);
+        vm.writeFile(LibFs.pathForContract(name), "PRE-EXISTING");
+        address instance = address(new CodeGennable());
+
+        // Caught rather than expected, and everything read off disk before any
+        // assertion, so the orphan is removed on the runs that fail too. It is
+        // a file this refusal fires on, and every test here shares the one
+        // generated directory, so one left behind is a precondition the next
+        // run does not get to choose.
+        bytes memory outcome;
+        try iExternal.buildFileForContract(
+            vm, instance, name, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, "\n// body\n"
+        ) {}
+        catch (bytes memory reason) {
+            outcome = reason;
+        }
+        bool currentPathIsPresent = vm.exists(LibFs.pathForContract(name));
+        string memory currentPathContent = currentPathIsPresent ? vm.readFile(LibFs.pathForContract(name)) : "";
+        string memory orphanContent = vm.readFile(orphan);
+
+        cleanupPath(orphan);
+        cleanup(name);
+
+        assertEq(
+            outcome,
+            abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, orphan),
+            string.concat("not refused as OrphanedGeneratedArtifact(", orphan, ")")
+        );
+        assertTrue(currentPathIsPresent, "a refused generation unlinked the file at the generated path");
+        assertEq(currentPathContent, "PRE-EXISTING", "a refused generation wrote a second artifact");
+        assertEq(orphanContent, existing, "the artifact that was already there was touched");
+    }
+
+    /// The refusal is the exception and not the rule: a generated directory
+    /// holding nothing for this contract generates, and one holding another
+    /// contract's artifact generates too. Driven through `buildFileForContract`
+    /// rather than through the check directly, so the call site is what is
+    /// asserted to accept.
+    function testBuildFileForContractGeneratesWhenNoOtherArtifactExists() external {
+        string memory name = "LibFsBuildNoOrphan";
+        string memory otherContract = string.concat(GENERATED_DIR, "/LibFsBuildNoOrphanOther.pointers.sol");
+        cleanup(name);
+        cleanupPath(string.concat(GENERATED_DIR, "/", name, ".pointers.sol"));
+        cleanupPath(otherContract);
+        vm.writeFile(otherContract, "// another contract's artifact\n");
+        address instance = address(new CodeGennable());
+        string memory body = "\n// no orphan\n";
+
+        LibFs.buildFileForContract(vm, instance, name, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body);
+
+        string memory written = vm.readFile(LibFs.pathForContract(name));
+        cleanup(name);
+        cleanupPath(otherContract);
+        assertEq(written, expectedFile(instance, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body));
+    }
+
+    /// The `dir` overload reads the directory it writes into, not
+    /// `GENERATED_DIR`. A consumer's snapshot directory and the live one hold
+    /// artifacts for the same contract names by design, so a check keyed on
+    /// `GENERATED_DIR` would refuse every snapshot generation for the live
+    /// artifact sitting beside it, and would miss an orphan in the snapshot
+    /// directory itself.
+    function testBuildFileForContractChecksTheDirectoryItWritesTo() external {
+        string memory name = "LibFsBuildDirOrphan";
+        string memory dir = string.concat(GENERATED_DIR, "/LibFsBuildDirOrphanSnapshot");
+        string memory liveOrphan = string.concat(GENERATED_DIR, "/", name, ".pointers.sol");
+        string memory dirOrphan = string.concat(dir, "/", name, ".pointers.sol");
+        cleanupPath(dir);
+        cleanupPath(liveOrphan);
+        cleanup(name);
+        address instance = address(new CodeGennable());
+        string memory body = "\n// snapshot\n";
+
+        // An orphan in `GENERATED_DIR` does not refuse a write into `dir`.
+        vm.writeFile(liveOrphan, "// live orphan\n");
+        LibFs.buildFileForContract(vm, instance, dir, name, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body);
+        string memory written = vm.readFile(string.concat(dir, "/", name, ".sol"));
+
+        // An orphan in `dir` does refuse it.
+        vm.writeFile(dirOrphan, "// snapshot orphan\n");
+        bytes memory outcome;
+        try iExternal.buildFileForContract(vm, instance, dir, name, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body) {}
+        catch (bytes memory reason) {
+            outcome = reason;
+        }
+
+        cleanupPath(dir);
+        cleanupPath(liveOrphan);
+
+        assertEq(
+            written,
+            expectedFile(instance, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body),
+            "an orphan outside the directory written to refused the write"
+        );
+        assertEq(
+            outcome,
+            abi.encodeWithSelector(OrphanedGeneratedArtifact.selector, dirOrphan),
+            string.concat("not refused as OrphanedGeneratedArtifact(", dirOrphan, ")")
+        );
+    }
+
+    /// The check reads what is inside the directory, never the directory's own
+    /// name, and it reads it after `vm.createDir` rather than before.
+    ///
+    /// `vm.readDir` does not revert on a directory that is not there: it
+    /// returns one entry whose `path` is that directory and whose
+    /// `errorMessage` says why. A check placed ahead of the create therefore
+    /// reads that one entry, and for a directory whose own final segment reads
+    /// as an artifact for the contract it refuses the very first generation —
+    /// naming, as the orphan, the directory it was about to create. Driven
+    /// through such a directory, because that is the only shape the two
+    /// orderings disagree on.
+    function testBuildFileForContractReadsTheDirectoryNotItsOwnName() external {
+        string memory name = "LibFsBuildDirName";
+        string memory dir = string.concat(GENERATED_DIR, "/", name, ".snapshot");
+        cleanupPath(dir);
+        assertFalse(vm.exists(dir), "dirty precondition");
+        address instance = address(new CodeGennable());
+        string memory body = "\n// dir name\n";
+
+        LibFs.buildFileForContract(vm, instance, dir, name, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body);
+
+        string memory written = vm.readFile(string.concat(dir, "/", name, ".sol"));
+        cleanupPath(dir);
+        assertEq(written, expectedFile(instance, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body));
     }
 }

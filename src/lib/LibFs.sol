@@ -24,6 +24,14 @@ string constant GENERATED_DIR = "src/generated";
 /// @param stderr What the removal wrote to stderr.
 error SymlinkRemovalFailed(string path, int32 exitCode, bytes stderr);
 
+/// Thrown when the generated directory holds an artifact for a contract other
+/// than the one `pathForContract` names for it. Consumers commit these files
+/// and import them by path, so an artifact this library does not write is one
+/// nothing regenerates: its imports keep resolving to a frozen codehash while
+/// the build reports success.
+/// @param path The artifact nothing regenerates, relative to the project root.
+error OrphanedGeneratedArtifact(string path);
+
 /// Thrown when a tag is not a single path segment drawn from the tag alphabet.
 /// Such a tag cannot be interpolated into a directory path.
 /// @param tag The rejected tag.
@@ -120,6 +128,97 @@ library LibFs {
         return string.concat(dir, "/", contractName, ".sol");
     }
 
+    /// The final segment of `path`: the bytes after its last `/`, or all of
+    /// `path` when it has none. `vm.readDir` reports absolute paths, so this is
+    /// what carries an entry's own name.
+    /// @param path The path to take the final segment of.
+    /// @return The final segment.
+    function lastPathSegment(string memory path) internal pure returns (string memory) {
+        bytes memory pathBytes = bytes(path);
+        uint256 start = 0;
+        for (uint256 i = 0; i < pathBytes.length; i++) {
+            if (pathBytes[i] == "/") {
+                start = i + 1;
+            }
+        }
+        bytes memory segment = new bytes(pathBytes.length - start);
+        for (uint256 i = 0; i < segment.length; i++) {
+            segment[i] = pathBytes[start + i];
+        }
+        return string(segment);
+    }
+
+    /// @notice Reverts if `GENERATED_DIR` holds an artifact for `contractName`
+    /// other than the one at `pathForContract(contractName)`.
+    ///
+    /// An artifact for a contract is a direct child of `GENERATED_DIR` named
+    /// for that contract: the name in full, then a `.`, then anything. The full
+    /// name up to the `.` is what separates one contract's artifact from
+    /// another's, so a repo generating both `Foo` and `FooBar` keeps both.
+    ///
+    /// `pathForContract` names exactly one such child, and that one is asked
+    /// for here rather than spelled out again, so whichever file that function
+    /// names is the current artifact and every other one is a file this library
+    /// does not write. Nothing regenerates those, while the consumer's `src/**`
+    /// keeps importing them, so they are refused rather than left frozen beside
+    /// a fresh generation.
+    ///
+    /// Only direct children are read. `pathForContract` never names anything
+    /// deeper, so a per release snapshot directory holds nothing this library
+    /// wrote and is left alone.
+    ///
+    /// Inherits `pathForContract`'s refusal to produce a path for a name that
+    /// is not a Solidity identifier.
+    /// @param vm The Vm instance for file operations.
+    /// @param contractName The name of the contract.
+    function requireNoOrphanedArtifact(Vm vm, string memory contractName) internal view {
+        requireNoOrphanedArtifactIn(vm, GENERATED_DIR, contractName);
+    }
+
+    /// @notice Reverts if `dir` holds an artifact for `contractName` other than
+    /// the one at `pathForContractIn(dir, contractName)`.
+    /// @dev `requireNoOrphanedArtifact` is this function applied to
+    /// `GENERATED_DIR`, so everything stated there holds here too, of `dir`
+    /// rather than of `GENERATED_DIR`. It is private for the same reason
+    /// `pathForContractIn` is: the only directory a consumer of this library
+    /// writes to is `GENERATED_DIR`, and `dir` is interpolated verbatim and is
+    /// not checked.
+    ///
+    /// The whole check is one read of `dir`, and `vm.readDir` does not revert
+    /// when that read fails: it returns a single entry naming `dir` itself and
+    /// carrying an `errorMessage`. No artifact name matches that entry, so a
+    /// directory that cannot be read is accepted rather than refused. That is
+    /// the answer wanted for a repo with no generated directory yet, and it is
+    /// why `buildFileForContract` creates `dir` before calling this: after a
+    /// `vm.createDir` that did not itself revert, the read is of a directory
+    /// that is there.
+    /// @param vm The Vm instance for file operations.
+    /// @param dir The directory to read, without a trailing separator,
+    /// interpolated verbatim.
+    /// @param contractName The name of the contract.
+    function requireNoOrphanedArtifactIn(Vm vm, string memory dir, string memory contractName) private view {
+        bytes32 currentArtifact = keccak256(bytes(lastPathSegment(pathForContractIn(dir, contractName))));
+        bytes memory prefix = bytes(string.concat(contractName, "."));
+        //forge-lint: disable-next-line(unsafe-cheatcode)
+        Vm.DirEntry[] memory entries = vm.readDir(dir);
+        for (uint256 i = 0; i < entries.length; i++) {
+            bytes memory name = bytes(lastPathSegment(entries[i].path));
+            if (name.length < prefix.length || keccak256(name) == currentArtifact) {
+                continue;
+            }
+            bool isArtifact = true;
+            for (uint256 j = 0; j < prefix.length; j++) {
+                if (name[j] != prefix[j]) {
+                    isArtifact = false;
+                    break;
+                }
+            }
+            if (isArtifact) {
+                revert OrphanedGeneratedArtifact(string.concat(dir, "/", string(name)));
+            }
+        }
+    }
+
     /// @notice Constructs the file path for a contract's generated file inside a
     /// tag's directory, which is the layout per release deploy pin snapshots
     /// use.
@@ -174,28 +273,6 @@ library LibFs {
         }
     }
 
-    /// @notice The part of `path` after its last separator, which for a direct
-    /// child of a directory is the name it has within that directory. Hashed, so
-    /// that comparing two of them is one equality rather than a loop at every
-    /// call site.
-    /// @param path The path to take the last segment of.
-    /// @return The hash of everything after the last `/`, or of the whole string
-    /// when there is no `/` in it.
-    function lastSegment(string memory path) private pure returns (bytes32) {
-        bytes memory pathBytes = bytes(path);
-        uint256 start = 0;
-        for (uint256 i = 0; i < pathBytes.length; i++) {
-            if (pathBytes[i] == "/") {
-                start = i + 1;
-            }
-        }
-        bytes memory segment = new bytes(pathBytes.length - start);
-        for (uint256 i = 0; i < segment.length; i++) {
-            segment[i] = pathBytes[start + i];
-        }
-        return keccak256(segment);
-    }
-
     /// @notice True if `path`, which must be a direct child of `dir`, is itself
     /// a symlink, whether or not it resolves to anything.
     /// @dev Every cheatcode that takes a path resolves it before it acts, so
@@ -230,10 +307,10 @@ library LibFs {
     /// @param path The path to check.
     /// @return True if the path itself is a symlink.
     function isSymlinkIn(Vm vm, string memory dir, string memory path) private view returns (bool) {
-        bytes32 name = lastSegment(path);
+        bytes32 name = keccak256(bytes(lastPathSegment(path)));
         VmSafe.DirEntry[] memory entries = vm.readDir(dir, 1, false);
         for (uint256 i = 0; i < entries.length; i++) {
-            if (lastSegment(entries[i].path) == name) {
+            if (keccak256(bytes(lastPathSegment(entries[i].path))) == name) {
                 return entries[i].isSymlink;
             }
         }
@@ -306,6 +383,13 @@ library LibFs {
     /// nothing is created, unlinked or written unless there is content to
     /// write.
     ///
+    /// Another artifact for the same contract already in `GENERATED_DIR`
+    /// refuses the whole call, before anything at the path is unlinked or
+    /// written, so a generation never lands beside a file that nothing
+    /// regenerates. The directory is created first, because the check is a read
+    /// of it and a consumer generating for the first time has neither the
+    /// directory nor an orphan in it.
+    ///
     /// Whatever is at the path comes off it before the write, so a symlink
     /// there is replaced by a regular file rather than written through to its
     /// target, whether or not that target exists, and the path holds nothing
@@ -358,8 +442,9 @@ library LibFs {
     /// inside `GENERATED_DIR`.
     /// @dev Identical to `buildFileForContract` in every other respect, and
     /// that function is this one applied to `GENERATED_DIR`: `dir` is what gets
-    /// created when it is missing, and what the file is written a direct child
-    /// of. `dir` is interpolated verbatim and is not checked, so a caller
+    /// created when it is missing, what is read for another artifact of the
+    /// same contract, and what the file is written a direct child of. `dir` is
+    /// interpolated verbatim and is not checked, so a caller
     /// passing something other than a directory it means to own gets whatever
     /// `fs_permissions` allows; `contractName` is still required to be a
     /// Solidity identifier, so the name can never carry the file out of `dir`.
@@ -395,6 +480,7 @@ library LibFs {
         );
         //forge-lint: disable-next-line(unsafe-cheatcode)
         vm.createDir(dir, true);
+        requireNoOrphanedArtifactIn(vm, dir, contractName);
         // Whatever is at the path has to come off it before the write, or the
         // write lands on what a link there resolves to rather than on the path.
         //

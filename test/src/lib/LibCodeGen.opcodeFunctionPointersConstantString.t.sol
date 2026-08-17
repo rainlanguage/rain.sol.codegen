@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibCodeGen} from "src/lib/LibCodeGen.sol";
 import {IOpcodeToolingV1} from "src/interface/IOpcodeToolingV1.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";

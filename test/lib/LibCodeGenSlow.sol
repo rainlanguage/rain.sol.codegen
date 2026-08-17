@@ -44,11 +44,10 @@ error NoSlice(string text, string open, string close);
 /// than imported, so a change to a literal in `LibCodeGen` shows up as a
 /// disagreement instead of moving both sides at once.
 ///
-/// The empty comment case is the one place the two sides state the same rule
-/// rather than deriving it independently: a declaration is preceded by one
-/// blank line, and by a comment line only when there is a comment. The exact
-/// text of both cases is pinned separately by literal assertions, so this
-/// reference is not the only thing holding it.
+/// The lines that precede a declaration are assembled here from the rule they
+/// follow: one blank line always, and a comment line only when there is a
+/// comment. The exact text of both cases is pinned separately by literal
+/// assertions, so this reference is not the only thing holding it.
 library LibCodeGenSlow {
     /// `vm.toString` on a `bytes` always prefixes `0x`, which a `hex"..."`
     /// literal must not carry. Dropped by copying the tail one byte at a time so
@@ -73,13 +72,31 @@ library LibCodeGenSlow {
         return oneLine;
     }
 
+    /// The lines that precede a declaration, listed out and then joined one
+    /// newline terminated line at a time: a blank line always, and a comment
+    /// line only when there is a comment. `LibCodeGen.commentPrefix` instead
+    /// chooses between two whole prefix literals, so the two agree only when
+    /// both the number of lines and the text of each one is right.
+    function commentPrefixSlow(string memory comment) internal pure returns (string memory) {
+        string[] memory lines = new string[](bytes(comment).length == 0 ? 1 : 2);
+        lines[0] = "";
+        if (lines.length == 2) {
+            lines[1] = comment;
+        }
+        string memory prefix = "";
+        for (uint256 i = 0; i < lines.length; i++) {
+            prefix = string.concat(prefix, lines[i], "\n");
+        }
+        return prefix;
+    }
+
     function bytesConstantStringSlow(Vm vm, string memory comment, string memory name, bytes memory data)
         internal
         pure
         returns (string memory)
     {
         return string.concat(
-            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
+            commentPrefixSlow(comment),
             joinSlow(string.concat("bytes constant ", name, " ="), string.concat("hex\"", hexOfSlow(vm, data), "\";")),
             "\n"
         );
@@ -91,7 +108,7 @@ library LibCodeGenSlow {
         returns (string memory)
     {
         return string.concat(
-            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
+            commentPrefixSlow(comment),
             joinSlow(string.concat("uint8 constant ", name, " ="), string.concat(vm.toString(uint256(data)), ";")),
             "\n"
         );
@@ -103,7 +120,7 @@ library LibCodeGenSlow {
         returns (string memory)
     {
         return string.concat(
-            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
+            commentPrefixSlow(comment),
             joinSlow(
                 string.concat("bytes32 constant ", name, " ="), string.concat("bytes32(", vm.toString(data), ");")
             ),
@@ -117,7 +134,7 @@ library LibCodeGenSlow {
         returns (string memory)
     {
         return string.concat(
-            bytes(comment).length == 0 ? "\n" : string.concat("\n", comment, "\n"),
+            commentPrefixSlow(comment),
             joinSlow(
                 string.concat("address constant ", name, " ="), string.concat("address(", vm.toString(data), ");")
             ),

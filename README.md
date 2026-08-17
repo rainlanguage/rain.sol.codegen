@@ -51,8 +51,13 @@ contract, in full, followed by a `.` and anything other than `sol`. Nothing
 regenerates such a file, while the consumer's imports keep resolving to it, so
 the build fails with `OrphanedGeneratedArtifact` naming the file rather than
 generating beside it. Delete it and repoint the imports at
-`src/generated/<Contract>.sol` in the same commit. Only direct children are
-read, so per release snapshot directories under `src/generated/` are untouched.
+`src/generated/<Contract>.sol` in the same commit.
+
+Only direct children are read, so a generation into `src/generated/` never reads
+inside the per release snapshot directories that sit there, and never refuses
+one of them either, because a tag carries no `.`. `buildFileForTaggedContract`
+writes into one of those directories, and reads that directory rather than
+`src/generated/`, so each is checked against its own contents.
 
 ## Formatter requirements
 

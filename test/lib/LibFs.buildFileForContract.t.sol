@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibFs} from "src/lib/LibFs.sol";
+import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 import {InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
@@ -28,6 +28,16 @@ contract LibFsBuildFileForContractTest is Test {
 
     constructor() {
         iExternal = new LibFsExternal();
+    }
+
+    /// `src/generated/` holds no committed file, so nothing in a fresh clone
+    /// creates it. `buildFileForContract` creates it for itself, but
+    /// `testBuildFileForContractReplacesExistingContent` writes its stale
+    /// content there directly first, and a filtered run may be only that test,
+    /// so the directory is not something this contract can inherit from a test
+    /// that happened to run earlier.
+    function setUp() external {
+        vm.createDir(GENERATED_DIR, true);
     }
 
     /// Every test writes under `src/generated/`, which holds nothing committed

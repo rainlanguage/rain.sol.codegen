@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 import {InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";

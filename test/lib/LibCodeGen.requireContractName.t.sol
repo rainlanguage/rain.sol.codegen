@@ -23,6 +23,9 @@ contract LibCodeGenRequireContractNameTest is Test {
         this.callRequireContractName(name);
     }
 
+    /// Rejection is asserted as the whole error, selector and argument: every
+    /// rejection below pins that the revert carries the name that was rejected,
+    /// so a build script that generates many files says which one it choked on.
     function assertRejected(string memory name) internal {
         vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, name));
         this.callRequireContractName(name);
@@ -133,36 +136,20 @@ contract LibCodeGenRequireContractNameTest is Test {
         assertRejected(string(hex"466f6f00"));
     }
 
-    /// The rejection carries the name that was rejected, so a build script that
-    /// generates many files says which one it choked on.
-    function testRequireContractNameErrorCarriesTheName() external {
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, "sub/Foo"));
-        this.callRequireContractName("sub/Foo");
-    }
-
-    /// Accepting a name is exactly accepting every one of its bytes, so an
-    /// accepted name can be rebuilt from the identifier alphabet and nothing
-    /// else. Fuzzed so that the check is not merely rejecting the handful of
-    /// bad names spelled out above.
+    /// Accepting a name is exactly accepting every one of its bytes, so
+    /// acceptance agrees with the reference alphabet, which is spelled out
+    /// character by character rather than restating the range arithmetic the
+    /// library decides with. The name is generated as a `string` rather than as
+    /// `bytes`, which is all that separates this from
+    /// `testRequireContractNameMatchesAlphabet`: uniform bytes are an identifier
+    /// only by accident, and the `string` generator lands on one several times
+    /// more often, so it is this test that carries the accepted half of the
+    /// domain.
     function testRequireContractNameAcceptedNamesAreIdentifiers(string memory name) external {
-        bytes memory nameBytes = bytes(name);
-        bool expectedValid = nameBytes.length > 0;
-        for (uint256 i = 0; i < nameBytes.length; i++) {
-            bytes1 char = nameBytes[i];
-            bool isLetter = (char >= "A" && char <= "Z") || (char >= "a" && char <= "z");
-            bool isDigit = char >= "0" && char <= "9";
-            bool isUnderscoreOrDollar = char == "_" || char == "$";
-            if (!(isLetter || isUnderscoreOrDollar || (isDigit && i > 0))) {
-                expectedValid = false;
-                break;
-            }
-        }
-
-        if (expectedValid) {
-            this.callRequireContractName(name);
+        if (LibCodeGenSlow.isContractNameSlow(name)) {
+            assertAccepted(name);
         } else {
-            vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, name));
-            this.callRequireContractName(name);
+            assertRejected(name);
         }
     }
 

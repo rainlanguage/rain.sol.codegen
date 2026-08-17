@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibCodeGen, InvalidSpdxLicenseIdentifier, InvalidCopyrightText} from "src/lib/LibCodeGen.sol";
 
 // The subject of this whole file is emitted licence text, so SPDX tag prefixes
@@ -59,6 +59,11 @@ contract LibCodeGenFilePrefixTest is Test {
     /// Pinned exactly, with this repo's own licence and copyright as the
     /// caller's values, so that lands as a deliberate, reviewable diff rather
     /// than a surprise on the next regeneration.
+    ///
+    /// This pins the prefix for one pair of caller values. It is no longer the
+    /// whole of the no-script claim — the licence and copyright are now the
+    /// caller's, so `testFilePrefixNamesNoScript` above still carries that
+    /// claim for the part of the prefix this library owns.
     function testFilePrefixExact() external pure {
         assertEq(
             LibCodeGen.filePrefix("LicenseRef-DCL-1.0", "Copyright (c) 2020 Rain Open Source Software Ltd"),

@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {VmSafe} from "forge-std-1.16.1/src/Vm.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
+import {VmSafe} from "forge-std-1.16.2/src/Vm.sol";
 import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 
 /// @title LibFsIsPresentTest
@@ -11,11 +11,21 @@ import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 /// that lands somewhere other than the path it was given, so what it answers for
 /// a symlink is asserted here together with the write that depends on it.
 ///
-/// Symlinks are built with `ln` because forge-std 1.16.1 has no cheatcode that
+/// Symlinks are built with `ln` because forge-std 1.16.2 has no cheatcode that
 /// creates one, and they are read back with `readlink`, which reports the path
 /// itself and fails on anything that is not a symlink. `vm.readLink` is what the
 /// library uses, so it is deliberately not what asserts here.
 contract LibFsIsPresentTest is Test {
+    /// `src/generated/` holds no committed file, so nothing in a fresh clone
+    /// creates it, and none of `ln`, `vm.writeFile` or `vm.createDir` for a
+    /// child of it creates the parent. `buildFileForContract` creates it for
+    /// itself, but suites run in any order and a filtered run may be only this
+    /// one, so this contract creates it rather than inheriting it from whatever
+    /// ran first.
+    function setUp() external {
+        vm.createDir(GENERATED_DIR, true);
+    }
+
     /// Every path this contract hands to the shell is built here from a bare
     /// name, so no test in it can name a path outside the generated directory.
     function pathFor(string memory name) internal pure returns (string memory) {

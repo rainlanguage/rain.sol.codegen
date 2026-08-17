@@ -1,6 +1,6 @@
 [package]
 name = "rain-sol-codegen"
-version = "0.1.17"
+version = "0.1.29"
 
 [profile.default]
 src = 'src'
@@ -11,14 +11,6 @@ libs = ['dependencies']
 
 solc = "0.8.25"
 
-# Try to make sure the optimizer doesn't touch the output in a way that can break
-# source maps for debugging.
-# via_ir = false
-# optimizer = false
-# optimizer_runs = 0
-# optimizer_steps = 0
-
-# These settings should be used for snapshots
 optimizer = true
 optimizer_runs = 1000000
 
@@ -27,7 +19,7 @@ cbor_metadata = false
 
 evm_version = "cancun"
 
-# No cheatcode in forge-std 1.16.1 creates a symlink, so the tests that pin what
+# No cheatcode in forge-std 1.16.2 creates a symlink, so the tests that pin what
 # this library does when it finds one at a generated path build it with `ln`.
 ffi = true
 
@@ -47,7 +39,7 @@ tab_width = 4
 runs = 2048
 
 [dependencies]
-forge-std = "1.16.1"
+forge-std = "1.16.2"
 
 [soldeer]
 recursive_deps = false

@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
-import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @dev A `bytes32` literal is 66 characters whatever the value, so the
 /// declaration is `96 + name.length` characters long on one line.
@@ -41,14 +41,16 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
         );
     }
 
-    /// The emitted value round-trips: the literal parses back to the same bytes32
-    /// rather than being truncated or reformatted.
+    /// The literal the declaration carries parses back to the value it was
+    /// generated from, rather than being truncated or reformatted. The literal
+    /// is sliced out of the emitted text, so the round trip is a property of
+    /// what the library wrote.
     function testBytes32ConstantStringRoundTrips(bytes32 data) external view {
+        string memory emitted = LibCodeGen.bytes32ConstantString(vm, "/// @dev Fuzz.", "FUZZ", data);
         assertEq(
-            LibCodeGen.bytes32ConstantString(vm, "/// @dev Fuzz.", "FUZZ", data),
-            string.concat("\n/// @dev Fuzz.\nbytes32 constant FUZZ = bytes32(", vm.toString(data), ");\n")
+            emitted, string.concat("\n/// @dev Fuzz.\nbytes32 constant FUZZ = bytes32(", vm.toString(data), ");\n")
         );
-        assertEq(vm.parseBytes32(vm.toString(data)), data);
+        assertEq(vm.parseBytes32(LibCodeGenSlow.betweenSlow(emitted, "bytes32(", ")")), data);
     }
 
     /// A declaration of exactly the maximum length stays on one line. `forge fmt`

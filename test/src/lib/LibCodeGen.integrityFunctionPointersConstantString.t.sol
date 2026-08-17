@@ -2,11 +2,11 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibCodeGen} from "src/lib/LibCodeGen.sol";
 import {IIntegrityToolingV1} from "src/interface/IIntegrityToolingV1.sol";
-import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
-import {ToolingMock} from "../concrete/ToolingMock.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
+import {ToolingMock} from "test/concrete/ToolingMock.sol";
 
 /// @dev The comment the library puts above this constant, spelled out here so
 /// that a change to it fails rather than moving both sides at once. This is the

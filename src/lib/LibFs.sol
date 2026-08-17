@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity ^0.8.25;
 
-import {Vm} from "forge-std-1.16.1/src/Vm.sol";
+import {Vm} from "forge-std-1.16.2/src/Vm.sol";
 import {LibCodeGen} from "./LibCodeGen.sol";
 
 /// @dev The directory that generated contract files are written to, relative to
@@ -32,8 +32,27 @@ library LibFs {
     /// @param contractName The name of the contract, interpolated verbatim.
     /// @return The file path as a string.
     function pathForContract(string memory contractName) internal pure returns (string memory) {
+        return pathForContractIn(GENERATED_DIR, contractName);
+    }
+
+    /// @notice Constructs the file path for a contract's generated file inside
+    /// `dir`.
+    /// @dev `pathForContract` is this function applied to `GENERATED_DIR`, so
+    /// everything stated there about the name holds here too: the path is a
+    /// direct child of `dir` for every name that is accepted at all, and an
+    /// accepted name is interpolated verbatim.
+    ///
+    /// `dir` is interpolated verbatim and is not checked, so where `dir` itself
+    /// sits is entirely the caller's, and only `fs_permissions` confines it.
+    /// That is why this is private rather than internal: the only directory a
+    /// consumer of this library writes to is `GENERATED_DIR`.
+    /// @param dir The directory to put the file in, without a trailing
+    /// separator, interpolated verbatim.
+    /// @param contractName The name of the contract, interpolated verbatim.
+    /// @return The file path as a string.
+    function pathForContractIn(string memory dir, string memory contractName) private pure returns (string memory) {
         LibCodeGen.requireContractName(contractName);
-        return string.concat(GENERATED_DIR, "/", contractName, ".sol");
+        return string.concat(dir, "/", contractName, ".sol");
     }
 
     /// @notice True if anything occupies `path`, including a symlink whose
@@ -67,8 +86,9 @@ library LibFs {
     /// of `GENERATED_DIR` and a rejected name reverts before any cheatcode is
     /// reached.
     ///
-    /// `GENERATED_DIR` is created if it does not exist, so the first generation
-    /// in a repo does not need it committed already.
+    /// `GENERATED_DIR` is created if it does not exist, along with any missing
+    /// parent of it, so the first generation in a repo does not need it
+    /// committed already.
     ///
     /// Anything already at the path is unlinked before the write, so a symlink
     /// there is replaced by a regular file rather than written through to its
@@ -101,9 +121,45 @@ library LibFs {
         string memory copyrightText,
         string memory body
     ) internal {
-        string memory path = pathForContract(contractName);
+        buildFileForContract(vm, instance, GENERATED_DIR, contractName, spdxLicenseIdentifier, copyrightText, body);
+    }
+
+    /// @notice Builds a file for a generated contract inside `dir` rather than
+    /// inside `GENERATED_DIR`.
+    /// @dev Identical to `buildFileForContract` in every other respect, and
+    /// that function is this one applied to `GENERATED_DIR`: `dir` is what gets
+    /// created when it is missing, and what the file is written a direct child
+    /// of. `dir` is interpolated verbatim and is not checked, so a caller
+    /// passing something other than a directory it means to own gets whatever
+    /// `fs_permissions` allows; `contractName` is still required to be a
+    /// Solidity identifier, so the name can never carry the file out of `dir`.
+    ///
+    /// This overload exists so that the directory creation is reachable from a
+    /// test without deleting `GENERATED_DIR`. Every test that generates a file
+    /// writes under `GENERATED_DIR`, and `forge` runs them in parallel, so
+    /// removing it to make it missing races all of them.
+    /// @param vm The Vm instance for file operations.
+    /// @param instance The contract instance whose bytecode hash is to be
+    /// included.
+    /// @param dir The directory to put the file in, without a trailing
+    /// separator, interpolated verbatim.
+    /// @param contractName The name of the contract.
+    /// @param spdxLicenseIdentifier The SPDX licence identifier the written file
+    /// declares.
+    /// @param copyrightText The copyright text the written file declares.
+    /// @param body The body of the contract file to be written.
+    function buildFileForContract(
+        Vm vm,
+        address instance,
+        string memory dir,
+        string memory contractName,
+        string memory spdxLicenseIdentifier,
+        string memory copyrightText,
+        string memory body
+    ) internal {
+        string memory path = pathForContractIn(dir, contractName);
         //forge-lint: disable-next-line(unsafe-cheatcode)
-        vm.createDir(GENERATED_DIR, true);
+        vm.createDir(dir, true);
         if (isPresent(vm, path)) {
             //forge-lint: disable-next-line(unsafe-cheatcode)
             vm.removeFile(path);

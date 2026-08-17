@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.1/src/Test.sol";
+import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibCodeGen, MAX_LINE_LENGTH} from "src/lib/LibCodeGen.sol";
-import {LibCodeGenSlow} from "./LibCodeGenSlow.sol";
+import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @dev A checksummed address literal, 42 characters like every other, so the
 /// declaration is `72 + name.length` characters long on one line.
@@ -33,14 +33,26 @@ contract LibCodeGenAddressConstantStringTest is Test {
         );
     }
 
-    /// The emitted literal is checksummed, so it round-trips back to the same
-    /// address rather than silently relying on an all-lowercase form.
+    /// The literal the declaration carries parses back to the address it was
+    /// generated from. The literal is sliced out of the emitted text, so the
+    /// round trip is a property of what the library wrote.
     function testAddressConstantStringRoundTrips(address data) external view {
         string memory emitted = LibCodeGen.addressConstantString(vm, "/// @dev Fuzz.", "FUZZ", data);
         assertEq(
             emitted, string.concat("\n/// @dev Fuzz.\naddress constant FUZZ = address(", vm.toString(data), ");\n")
         );
-        assertEq(vm.parseAddress(vm.toString(data)), data);
+        assertEq(vm.parseAddress(LibCodeGenSlow.betweenSlow(emitted, "address(", ")")), data);
+    }
+
+    /// The emitted literal is EIP-55 checksummed. `solc` rejects a forty digit
+    /// hex literal whose case does not carry the checksum, so a generated file
+    /// holding an all-lowercase address does not compile. `vm.parseAddress`
+    /// accepts either form, so the round trip cannot tell them apart and this
+    /// is stated against a reference that derives the checksum from the
+    /// address's own bits.
+    function testAddressConstantStringChecksummed(address data) external view {
+        string memory emitted = LibCodeGen.addressConstantString(vm, "/// @dev Fuzz.", "FUZZ", data);
+        assertEq(LibCodeGenSlow.betweenSlow(emitted, "address(", ")"), LibCodeGenSlow.checksumAddressSlow(data));
     }
 
     /// A declaration of exactly the maximum length stays on one line. `forge fmt`

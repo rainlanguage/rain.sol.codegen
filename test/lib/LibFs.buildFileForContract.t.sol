@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.1/src/Test.sol";
-import {LibFs} from "src/lib/LibFs.sol";
+import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 import {InvalidContractName} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
@@ -30,10 +30,22 @@ contract LibFsBuildFileForContractTest is Test {
         iExternal = new LibFsExternal();
     }
 
-    /// Every test writes under `src/generated/`, which is a committed directory
-    /// in this repo. Each test owns a distinct name so parallel suites cannot
-    /// collide, none of them is `CodeGennable` (the committed artifact), and
-    /// each removes its file again.
+    /// `src/generated/` holds no committed file, so nothing in a fresh clone
+    /// creates it. `buildFileForContract` creates it for itself, but
+    /// `testBuildFileForContractReplacesExistingContent` writes its stale
+    /// content there directly first, and a filtered run may be only that test,
+    /// so the directory is not something this contract can inherit from a test
+    /// that happened to run earlier.
+    function setUp() external {
+        vm.createDir(GENERATED_DIR, true);
+    }
+
+    /// Called by the tests that generate a file. `src/generated/` holds nothing
+    /// committed in this repo, so everything that lands there during a run is
+    /// this suite's scratch. Each generating test owns a distinct name so
+    /// parallel suites cannot collide, and removes its file again. The tests
+    /// that assert a name is refused write nothing at all and do not come
+    /// through here.
     function cleanup(string memory contractName) internal {
         string memory path = LibFs.pathForContract(contractName);
         if (vm.exists(path)) {

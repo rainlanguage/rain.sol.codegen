@@ -3,7 +3,7 @@
 pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
-import {LibCodeGen, MAX_LINE_LENGTH, InvalidContractName} from "src/lib/LibCodeGen.sol";
+import {LibCodeGen, MAX_LINE_LENGTH, InvalidIdentifier} from "src/lib/LibCodeGen.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
 
 /// @dev `describedByMetaHashConstantString` reads `meta/<name>.rain.meta`, and
@@ -215,7 +215,7 @@ contract LibCodeGenDescribedByMetaHashConstantStringTest is Test {
     }
 
     function assertRejectsName(string memory name) internal {
-        vm.expectRevert(abi.encodeWithSelector(InvalidContractName.selector, name));
+        vm.expectRevert(abi.encodeWithSelector(InvalidIdentifier.selector, name));
         this.callDescribedByMetaHash(name);
     }
 

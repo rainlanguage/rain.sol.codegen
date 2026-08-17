@@ -16,6 +16,16 @@ import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 /// itself and fails on anything that is not a symlink. `vm.readLink` is what the
 /// library uses, so it is deliberately not what asserts here.
 contract LibFsIsPresentTest is Test {
+    /// `src/generated/` holds no committed file, so nothing in a fresh clone
+    /// creates it, and none of `ln`, `vm.writeFile` or `vm.createDir` for a
+    /// child of it creates the parent. `buildFileForContract` creates it for
+    /// itself, but suites run in any order and a filtered run may be only this
+    /// one, so this contract creates it rather than inheriting it from whatever
+    /// ran first.
+    function setUp() external {
+        vm.createDir(GENERATED_DIR, true);
+    }
+
     /// Every path this contract hands to the shell is built here from a bare
     /// name, so no test in it can name a path outside the generated directory.
     function pathFor(string memory name) internal pure returns (string memory) {

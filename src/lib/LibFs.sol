@@ -90,6 +90,13 @@ library LibFs {
     /// parent of it, so the first generation in a repo does not need it
     /// committed already.
     ///
+    /// The whole file content is built before anything on disk is touched, and
+    /// building it reverts for an `instance` that holds no code. A revert does
+    /// not roll back cheatcode filesystem effects, so ordering the build first
+    /// is what keeps a failed generation from leaving the directory worse than
+    /// it found it: nothing is created, unlinked or written unless there is
+    /// content to write.
+    ///
     /// The path is unlinked until it holds nothing, then written, so a symlink
     /// there is replaced by a regular file rather than written through to its
     /// target, whether or not that target exists, and the path does not exist
@@ -145,6 +152,8 @@ library LibFs {
         string memory body
     ) internal {
         string memory path = pathForContractIn(dir, contractName);
+        string memory content =
+            string.concat(LibCodeGen.filePrefix(), LibCodeGen.bytecodeHashConstantString(vm, instance), body);
         //forge-lint: disable-next-line(unsafe-cheatcode)
         vm.createDir(dir, true);
         // `vm.removeFile` resolves the path before it acts, so on a live symlink
@@ -156,8 +165,6 @@ library LibFs {
             vm.removeFile(path);
         }
         //forge-lint: disable-next-line(unsafe-cheatcode)
-        vm.writeFile(
-            path, string.concat(LibCodeGen.filePrefix(), LibCodeGen.bytecodeHashConstantString(vm, instance), body)
-        );
+        vm.writeFile(path, content);
     }
 }

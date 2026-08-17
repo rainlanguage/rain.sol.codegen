@@ -84,6 +84,15 @@ contract RemovalVm {
         entries = sEntries;
     }
 
+    /// The same listing, for the overload the orphan check reads the directory
+    /// with. One directory has one set of entries whichever overload asks for
+    /// them, so answering differently here would make the orphan check's
+    /// verdict a property of this stand-in rather than of the listing the test
+    /// constructed.
+    function readDir(string calldata) external view returns (VmSafe.DirEntry[] memory entries) {
+        entries = sEntries;
+    }
+
     /// The removal that acts on a link, reporting whatever the constructor was
     /// given.
     function tryFfi(string[] calldata) external view returns (VmSafe.FfiResult memory result) {

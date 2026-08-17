@@ -8,9 +8,10 @@ import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 
 /// @title LibFsIsPresentTest
-/// @notice `isPresent` is what stands between `buildFileForContract` and a write
-/// that lands somewhere other than the path it was given, so what it answers for
-/// a symlink is asserted here together with the write that depends on it.
+/// @notice `isPresent` is what stands between the two write functions and a
+/// write that lands somewhere other than the path it was given, so what it
+/// answers for a symlink is asserted here together with both writes that depend
+/// on it.
 ///
 /// Symlinks are built with `ln` because forge-std 1.16.2 has no cheatcode that
 /// creates one, and they are read back with `readlink`, which reports the path
@@ -90,6 +91,17 @@ contract LibFsIsPresentTest is Test {
         return readlinkAt(pathFor(name));
     }
 
+    /// Creates the directory at `name` and every missing parent of it, so a
+    /// symlink can be placed inside a directory that the write also creates.
+    function makeDir(string memory name) internal {
+        string[] memory command = new string[](3);
+        command[0] = "mkdir";
+        command[1] = "-p";
+        command[2] = pathFor(name);
+        VmSafe.FfiResult memory result = vm.tryFfi(command);
+        assertEq(result.exitCode, 0, string(result.stderr));
+    }
+
     /// `rm -rf` removes a dangling symlink and succeeds on a path that holds
     /// nothing, neither of which is true of the cheatcodes. Setup and cleanup
     /// that leaned on the behaviour under test would leave the tree dirty
@@ -106,6 +118,31 @@ contract LibFsIsPresentTest is Test {
     /// `removeAt` for a path inside the generated directory.
     function remove(string memory name) internal {
         removeAt(pathFor(name));
+    }
+
+    /// True if the first entry of a two deep listing of the generated directory
+    /// whose path ends with `first` comes before the one whose path ends with
+    /// `second`. Both are asserted to be there, so a suffix that names nothing
+    /// fails here rather than reading as an ordering.
+    ///
+    /// Two deep is deliberately deeper than the library asks for: what this
+    /// establishes is which of the two a listing that did reach the second
+    /// level would answer from.
+    function listedBefore(string memory first, string memory second) internal returns (bool) {
+        VmSafe.DirEntry[] memory entries = vm.readDir(GENERATED_DIR, 2, false);
+        uint256 firstIndex = type(uint256).max;
+        uint256 secondIndex = type(uint256).max;
+        for (uint256 i = 0; i < entries.length; i++) {
+            if (firstIndex == type(uint256).max && vm.contains(entries[i].path, first)) {
+                firstIndex = i;
+            }
+            if (secondIndex == type(uint256).max && vm.contains(entries[i].path, second)) {
+                secondIndex = i;
+            }
+        }
+        assertTrue(firstIndex != type(uint256).max, string.concat("nothing in the listing ends with ", first));
+        assertTrue(secondIndex != type(uint256).max, string.concat("nothing in the listing ends with ", second));
+        return firstIndex < secondIndex;
     }
 
     /// Generates `name` into the generated directory. The licence and copyright
@@ -225,6 +262,61 @@ contract LibFsIsPresentTest is Test {
         remove(controlFileName);
     }
 
+    /// The tagged write carries the same guarantee at its own path: a symlink
+    /// with no target inside the tag's directory is replaced by a regular file
+    /// holding the generated content, and the link's target is not created.
+    ///
+    /// The link's target is named relative to the directory the link sits in,
+    /// which is the tag's directory rather than the generated directory, so the
+    /// two names for it differ by that segment.
+    ///
+    /// The content is compared against a second contract generated in the same
+    /// tag at a path that held nothing, so the claim is that the two cases
+    /// produce the same file rather than that some particular bytes appear.
+    function testBuildFileForTaggedContractReplacesDanglingSymlink() external {
+        string memory tag = "0_1_1$isPresentDangling";
+        string memory name = "LibFsIsPresentTaggedDangling";
+        string memory controlName = "LibFsIsPresentTaggedControl";
+        string memory linkName = string.concat(tag, "/", name, ".sol");
+        string memory linkTarget = "LibFsIsPresentTaggedDanglingTarget.txt";
+        string memory targetName = string.concat(tag, "/", linkTarget);
+        string memory controlFileName = string.concat(tag, "/", controlName, ".sol");
+        remove(tag);
+        makeDir(tag);
+
+        symlink(linkName, linkTarget);
+        assertEq(LibFs.pathForTaggedContract(tag, name), pathFor(linkName), "the link is not where the write goes");
+        assertEq(readlink(linkName).exitCode, 0, "the path under test is not a symlink");
+        assertFalse(vm.exists(pathFor(targetName)), "the link target is already there");
+        assertFalse(vm.exists(pathFor(linkName)), "the link is not dangling");
+
+        string memory body = "\n// dangling\n";
+        // The licence and copyright reach the header and nothing here reads the
+        // header, so this repo's own values stand in for a caller's.
+        LibFs.buildFileForTaggedContract(
+            vm, address(this), tag, name, "LicenseRef-DCL-1.0", "Copyright (c) 2020 Rain Open Source Software Ltd", body
+        );
+        LibFs.buildFileForTaggedContract(
+            vm,
+            address(this),
+            tag,
+            controlName,
+            "LicenseRef-DCL-1.0",
+            "Copyright (c) 2020 Rain Open Source Software Ltd",
+            body
+        );
+
+        assertFalse(vm.exists(pathFor(targetName)), "the write followed the link to its target");
+        assertTrue(readlink(linkName).exitCode != 0, "the path is still a symlink");
+        assertEq(
+            vm.readFile(pathFor(linkName)),
+            vm.readFile(pathFor(controlFileName)),
+            "the file at the path is not what a write to a path holding nothing produces"
+        );
+
+        remove(tag);
+    }
+
     /// A symlink at the generated path whose target exists is replaced by a
     /// regular file holding the generated content, and the target does not
     /// receive it: the write goes to the path, not through it.
@@ -314,6 +406,68 @@ contract LibFsIsPresentTest is Test {
 
         assertTrue(targetExists, "a committed file outside the generated directory was destroyed by the write");
         assertEq(target, "COMMITTED", "the file outside the generated directory was rewritten by the write");
+        assertFalse(linkIsStillASymlink, "the path is still a symlink");
+        assertTrue(vm.contains(written, body), "the generated file did not land at the path");
+    }
+
+    /// What the directory listing says about the path is what decides which
+    /// removal runs, and only a direct child of the generated directory is that
+    /// path. A file one level deeper can share its name exactly:
+    /// `src/generated/<tag>/<Name>.sol` is what `buildFileForTaggedContract`
+    /// writes, and a frozen snapshot of `<Name>` sits there while `<Name>` is
+    /// also generated one level up. The listing comes back sorted by path, so
+    /// the deeper one is reported first whenever its directory sorts before the
+    /// file, which the names here arrange.
+    ///
+    /// The decoy is a regular file and the generated path is a live symlink, so
+    /// a listing that answered from the decoy would send the removal through
+    /// the link to its target: the same destruction, arrived at from a
+    /// different direction. The target's bytes are what assert it did not.
+    ///
+    /// That the decoy would be reached first is a property of the fixture
+    /// rather than of the library, so it is asserted rather than assumed: a
+    /// listing that stopped putting the decoy first would leave this test
+    /// passing without discriminating anything.
+    function testBuildFileForContractMatchesOnlyDirectChildren() external {
+        string memory name = "LibFsIsPresentDepthZ";
+        string memory linkName = "LibFsIsPresentDepthZ.sol";
+        string memory targetName = "LibFsIsPresentDepthZTarget.txt";
+        string memory decoyDir = "LibFsIsPresentDepthDecoy";
+        string memory decoyName = string.concat(decoyDir, "/", linkName);
+        remove(linkName);
+        remove(targetName);
+        remove(decoyDir);
+
+        makeDir(decoyDir);
+        vm.writeFile(pathFor(decoyName), "DECOY");
+        vm.writeFile(pathFor(targetName), "SENTINEL");
+        symlink(linkName, targetName);
+        assertEq(LibFs.pathForContract(name), pathFor(linkName), "the link is not where the write goes");
+        assertEq(readlink(linkName).exitCode, 0, "the path under test is not a symlink");
+        assertTrue(vm.exists(pathFor(linkName)), "the link does not resolve");
+        assertEq(vm.readFile(pathFor(targetName)), "SENTINEL", "the link target is not the seeded file");
+        assertEq(vm.readFile(pathFor(decoyName)), "DECOY", "the decoy is not the seeded file");
+        assertTrue(
+            listedBefore(string.concat("/", decoyName), string.concat("/", GENERATED_DIR, "/", linkName)),
+            "the decoy is not what a listing reaching it would reach first"
+        );
+
+        string memory body = "\n// depth\n";
+        generate(name, body);
+
+        bool linkIsStillASymlink = readlink(linkName).exitCode == 0;
+        bool targetExists = vm.exists(pathFor(targetName));
+        string memory target = targetExists ? vm.readFile(pathFor(targetName)) : "";
+        string memory decoy = vm.exists(pathFor(decoyName)) ? vm.readFile(pathFor(decoyName)) : "";
+        string memory written = vm.readFile(pathFor(linkName));
+
+        remove(linkName);
+        remove(targetName);
+        remove(decoyDir);
+
+        assertTrue(targetExists, "an entry one directory deeper answered for the path");
+        assertEq(target, "SENTINEL", "the link target's own content did not survive the write");
+        assertEq(decoy, "DECOY", "the entry one directory deeper was disturbed");
         assertFalse(linkIsStillASymlink, "the path is still a symlink");
         assertTrue(vm.contains(written, body), "the generated file did not land at the path");
     }

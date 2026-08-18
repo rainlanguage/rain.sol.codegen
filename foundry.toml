@@ -6,7 +6,7 @@
 # `forge config --fix` rewrites into `[profile.*]`.
 [external.package]
 name = "rain-sol-codegen"
-version = "0.1.36"
+version = "0.1.37"
 
 [profile.default]
 src = 'src'

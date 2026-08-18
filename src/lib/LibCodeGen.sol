@@ -125,9 +125,10 @@ library LibCodeGen {
     /// their tags, and both have to be a non-empty single line for the tag they
     /// land on to say what it appears to.
     ///
-    /// The overload that takes neither makes that statement out of this org's
-    /// values, which only a repo this org owns can make. A consumer outside it
-    /// calls this one.
+    /// The overload taking no arguments makes that statement out of this org's
+    /// own values, which is a statement only a repo this org owns can make. A
+    /// consumer in another org calls this two argument overload and passes its
+    /// own values.
     /// @param spdxLicenseIdentifier The SPDX licence identifier for the
     /// generated file, interpolated verbatim.
     /// @param copyrightText The copyright text for the generated file,

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.25;
 
 import {Vm, VmSafe} from "forge-std-1.16.2/src/Vm.sol";
-import {LibCodeGen} from "./LibCodeGen.sol";
+import {LibCodeGen, RAIN_SPDX_LICENSE_IDENTIFIER, RAIN_COPYRIGHT_TEXT} from "./LibCodeGen.sol";
 
 /// @dev The directory that generated contract files are written to, relative to
 /// the project root. Consumers commit this directory and import from it by
@@ -438,6 +438,27 @@ library LibFs {
         buildFileForContract(vm, instance, GENERATED_DIR, contractName, spdxLicenseIdentifier, copyrightText, body);
     }
 
+    /// @notice Builds a file for a generated contract, declaring the licence and
+    /// the copyright text this org's repos declare for their own source.
+    /// @dev This is `buildFileForContract` applied to
+    /// `RAIN_SPDX_LICENSE_IDENTIFIER` and `RAIN_COPYRIGHT_TEXT`, so everything
+    /// that function states holds here, including the rule those two values are
+    /// subject to like any other.
+    ///
+    /// The file lands in the calling project's repo, so the header is a
+    /// statement that project makes about its own source. This overload makes it
+    /// out of this org's values, which is right for a repo this org owns and
+    /// wrong for every other repo; a consumer elsewhere calls the overload that
+    /// takes the two values, and passes its own.
+    /// @param vm The Vm instance for file operations.
+    /// @param instance The contract instance whose bytecode hash is to be
+    /// included.
+    /// @param contractName The name of the contract.
+    /// @param body The body of the contract file to be written.
+    function buildFileForContract(Vm vm, address instance, string memory contractName, string memory body) internal {
+        buildFileForContract(vm, instance, contractName, RAIN_SPDX_LICENSE_IDENTIFIER, RAIN_COPYRIGHT_TEXT, body);
+    }
+
     /// @notice Builds a file for a generated contract inside `dir` rather than
     /// inside `GENERATED_DIR`.
     /// @dev Identical to `buildFileForContract` in every other respect, and
@@ -508,6 +529,35 @@ library LibFs {
         vm.writeFile(path, content);
     }
 
+    /// @notice Builds a file for a generated contract inside `dir`, declaring
+    /// the licence and the copyright text this org's repos declare for their own
+    /// source.
+    /// @dev This is the `dir` overload of `buildFileForContract` applied to
+    /// `RAIN_SPDX_LICENSE_IDENTIFIER` and `RAIN_COPYRIGHT_TEXT`, so everything
+    /// that overload states holds here. Choosing the directory and stating the
+    /// licence are independent of each other, so a caller that does the first
+    /// does not thereby have to do the second.
+    ///
+    /// The header is this org's, which is right for a repo this org owns and
+    /// wrong for every other repo; a consumer elsewhere calls the overload that
+    /// takes the two values, and passes its own.
+    /// @param vm The Vm instance for file operations.
+    /// @param instance The contract instance whose bytecode hash is to be
+    /// included.
+    /// @param dir The directory to put the file in, without a trailing
+    /// separator, interpolated verbatim.
+    /// @param contractName The name of the contract.
+    /// @param body The body of the contract file to be written.
+    function buildFileForContract(
+        Vm vm,
+        address instance,
+        string memory dir,
+        string memory contractName,
+        string memory body
+    ) internal {
+        buildFileForContract(vm, instance, dir, contractName, RAIN_SPDX_LICENSE_IDENTIFIER, RAIN_COPYRIGHT_TEXT, body);
+    }
+
     /// @notice Builds a file for a generated contract at
     /// `pathForTaggedContract(tag, contractName)`.
     ///
@@ -572,5 +622,35 @@ library LibFs {
         string memory body
     ) internal {
         buildFileForContract(vm, instance, dirForTag(tag), contractName, spdxLicenseIdentifier, copyrightText, body);
+    }
+
+    /// @notice Builds a file for a generated contract at
+    /// `pathForTaggedContract(tag, contractName)`, declaring the licence and the
+    /// copyright text this org's repos declare for their own source.
+    /// @dev This is `buildFileForTaggedContract` applied to
+    /// `RAIN_SPDX_LICENSE_IDENTIFIER` and `RAIN_COPYRIGHT_TEXT`, so everything
+    /// that function states holds here.
+    ///
+    /// The header is this org's, which is right for a repo this org owns and
+    /// wrong for every other repo; a consumer elsewhere calls the overload that
+    /// takes the two values, and passes its own. A tagged file is a per release
+    /// snapshot that the org's release convention freezes once written, so the
+    /// header it lands with is the header it keeps.
+    /// @param vm The Vm instance for file operations.
+    /// @param instance The contract instance whose bytecode hash is to be
+    /// included.
+    /// @param tag The tag whose directory the file lives in.
+    /// @param contractName The name of the contract.
+    /// @param body The body of the contract file to be written.
+    function buildFileForTaggedContract(
+        Vm vm,
+        address instance,
+        string memory tag,
+        string memory contractName,
+        string memory body
+    ) internal {
+        buildFileForTaggedContract(
+            vm, instance, tag, contractName, RAIN_SPDX_LICENSE_IDENTIFIER, RAIN_COPYRIGHT_TEXT, body
+        );
     }
 }

@@ -9,7 +9,9 @@ import {
     InvalidIdentifier,
     InvalidSpdxLicenseIdentifier,
     InvalidCopyrightText,
-    CodelessInstance
+    CodelessInstance,
+    RAIN_SPDX_LICENSE_IDENTIFIER,
+    RAIN_COPYRIGHT_TEXT
 } from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {RemovalVm, WriteReached, RemoveFileReached, FfiReached} from "test/concrete/RemovalVm.sol";
@@ -802,5 +804,57 @@ contract LibFsBuildFileForContractTest is Test {
         string memory written = vm.readFile(string.concat(dir, "/", name, ".sol"));
         cleanupPath(dir);
         assertEq(written, expectedFile(instance, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body));
+    }
+
+    /// A Rain repo writes without naming a licence or a copyright holder, and
+    /// the file that lands is byte for byte the file a caller naming the two
+    /// exported defaults gets. Both writes are for the same instance, so the
+    /// bytecode hash constant is identical in both and the header is the only
+    /// thing that could differ.
+    ///
+    /// Asserted against the literal as well, so the two spellings agreeing with
+    /// each other is not what makes this pass. A default that drifted from this
+    /// repo's own licence would move both files together, and only the literal
+    /// is outside the library to catch it.
+    function testBuildFileForContractDefaultHeaderIsRainsExplicitHeader() external {
+        string memory defaulted = "LibFsBuildDefaultHeader";
+        string memory named = "LibFsBuildNamedHeader";
+        cleanup(defaulted);
+        cleanup(named);
+        address instance = address(new CodeGennable());
+        string memory body = "\n// default header\n";
+
+        LibFs.buildFileForContract(vm, instance, defaulted, body);
+        LibFs.buildFileForContract(vm, instance, named, RAIN_SPDX_LICENSE_IDENTIFIER, RAIN_COPYRIGHT_TEXT, body);
+
+        string memory defaultedFile = vm.readFile(LibFs.pathForContract(defaulted));
+        string memory namedFile = vm.readFile(LibFs.pathForContract(named));
+        cleanup(defaulted);
+        cleanup(named);
+
+        assertEq(defaultedFile, namedFile, "the defaulted write is not the write that names the defaults");
+        assertEq(defaultedFile, expectedFile(instance, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body));
+    }
+
+    /// The `dir` overload defaults the header the same way. A caller that
+    /// chooses the directory is not thereby a caller that has to state the
+    /// licence, so the two arguments the overloads differ by are independent.
+    function testBuildFileForContractInDirDefaultHeaderIsRainsExplicitHeader() external {
+        string memory dir = string.concat(GENERATED_DIR, "/LibFsBuildDirDefaultHeader");
+        string memory defaulted = "LibFsBuildDirDefaultHeader";
+        string memory named = "LibFsBuildDirNamedHeader";
+        cleanupPath(dir);
+        address instance = address(new CodeGennable());
+        string memory body = "\n// dir default header\n";
+
+        LibFs.buildFileForContract(vm, instance, dir, defaulted, body);
+        LibFs.buildFileForContract(vm, instance, dir, named, RAIN_SPDX_LICENSE_IDENTIFIER, RAIN_COPYRIGHT_TEXT, body);
+
+        string memory defaultedFile = vm.readFile(string.concat(dir, "/", defaulted, ".sol"));
+        string memory namedFile = vm.readFile(string.concat(dir, "/", named, ".sol"));
+        cleanupPath(dir);
+
+        assertEq(defaultedFile, namedFile, "the defaulted write is not the write that names the defaults");
+        assertEq(defaultedFile, expectedFile(instance, SPDX_LICENSE_IDENTIFIER, COPYRIGHT_TEXT, body));
     }
 }

@@ -4,7 +4,7 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std-1.16.2/src/Test.sol";
 import {LibFs, GENERATED_DIR, InvalidTag} from "src/lib/LibFs.sol";
-import {InvalidIdentifier} from "src/lib/LibCodeGen.sol";
+import {InvalidIdentifier, RAIN_SPDX_LICENSE_IDENTIFIER, RAIN_COPYRIGHT_TEXT} from "src/lib/LibCodeGen.sol";
 import {CodeGennable} from "test/concrete/CodeGennable.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 import {LibCodeGenSlow} from "test/lib/LibCodeGenSlow.sol";
@@ -439,5 +439,34 @@ contract LibFsBuildFileForTaggedContractTest is Test {
         string memory contractName = string(nameBytes);
         vm.assume(!LibCodeGenSlow.isIdentifierSlow(contractName));
         assertNameRejected("0_1_1$taggedFuzzName", contractName);
+    }
+
+    /// A Rain repo writes a snapshot without naming a licence or a copyright
+    /// holder, and the file that lands is byte for byte the file a caller
+    /// naming the two exported defaults gets. Both writes are for the same
+    /// instance and into the same tag, so the header is the only thing that
+    /// could differ.
+    ///
+    /// Asserted against the literal as well, through `expectedFile`, which
+    /// spells this repo's licence and copyright out rather than reading them
+    /// back out of the library. A snapshot is frozen once written, so a header
+    /// that drifted is permanent in the release record.
+    function testBuildFileForTaggedContractDefaultHeaderIsRainsExplicitHeader() external {
+        string memory tag = "0_1_1$taggedDefaultHeader";
+        cleanup(tag);
+        address instance = address(new CodeGennable());
+        string memory body = "\n// default header\n";
+
+        LibFs.buildFileForTaggedContract(vm, instance, tag, "LibFsTaggedDefaultHeader", body);
+        LibFs.buildFileForTaggedContract(
+            vm, instance, tag, "LibFsTaggedNamedHeader", RAIN_SPDX_LICENSE_IDENTIFIER, RAIN_COPYRIGHT_TEXT, body
+        );
+
+        string memory defaultedFile = vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedDefaultHeader"));
+        string memory namedFile = vm.readFile(LibFs.pathForTaggedContract(tag, "LibFsTaggedNamedHeader"));
+        cleanup(tag);
+
+        assertEq(defaultedFile, namedFile, "the defaulted write is not the write that names the defaults");
+        assertEq(defaultedFile, expectedFile(instance, body));
     }
 }

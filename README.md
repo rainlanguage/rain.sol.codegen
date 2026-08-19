@@ -146,8 +146,8 @@ reusable on every push to `main`, passing the package name explicitly as
 `soldeer-package: rain-sol-codegen`.
 
 That workflow owns both the version and the release tag, so neither is set by
-hand. `[external.package].version` in `foundry.toml` is therefore the next,
-unpublished version rather than the last published one.
+hand. The next version is derived from the Soldeer registry and `next-v*` git
+tags, so no version is recorded in this repo's files.
 
 ## License
 

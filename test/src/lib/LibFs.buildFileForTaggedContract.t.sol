@@ -118,8 +118,9 @@ contract LibFsBuildFileForTaggedContractTest is Test {
 
     /// The first generation for a tag has no directory yet, which is the normal
     /// case for a release: the snapshot directory is created by the run that
-    /// fills it. `vm.writeFile` does not create a missing parent, so the
-    /// directory creation is load bearing and this is what proves it.
+    /// fills it. `vm.writeFile` does not create a missing parent, so dropping
+    /// the directory creation would make this case fail to write. This test is
+    /// what proves it.
     function testBuildFileForTaggedContractCreatesTheTagDir() external {
         string memory tag = "0_1_1$taggedFreshDir";
         cleanup(tag);

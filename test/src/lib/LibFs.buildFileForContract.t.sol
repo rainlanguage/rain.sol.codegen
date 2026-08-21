@@ -135,9 +135,9 @@ contract LibFsBuildFileForContractTest is Test {
     }
 
     /// First generation for a contract is the normal case: nothing is at the
-    /// path yet. Removing a file that is not there reverts, so the existence
-    /// check in front of the removal is load bearing and this is what proves
-    /// it.
+    /// path yet. Removing a file that is not there reverts, so dropping the
+    /// existence check in front of the removal would make this case revert.
+    /// This test is what proves it.
     function testBuildFileForContractFreshPath() external {
         string memory name = "LibFsBuildFresh";
         cleanup(name);

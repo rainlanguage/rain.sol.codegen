@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.2/src/Test.sol";
-import {Vm, VmSafe} from "forge-std-1.16.2/src/Vm.sol";
+import {Test} from "forge-std-1.17.0/src/Test.sol";
+import {Vm, VmSafe} from "forge-std-1.17.0/src/Vm.sol";
 import {LibFs, GENERATED_DIR, SymlinkRemovalFailed, OrphanedGeneratedArtifact} from "src/lib/LibFs.sol";
 import {
     InvalidIdentifier,

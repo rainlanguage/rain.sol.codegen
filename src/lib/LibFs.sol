@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity ^0.8.25;
 
-import {Vm, VmSafe} from "forge-std-1.16.2/src/Vm.sol";
+import {Vm, VmSafe} from "forge-std-1.17.0/src/Vm.sol";
 import {LibCodeGen, RAIN_SPDX_LICENSE_IDENTIFIER, RAIN_COPYRIGHT_TEXT} from "./LibCodeGen.sol";
 
 /// @dev The directory that generated contract files are written to, relative to
@@ -324,7 +324,7 @@ library LibFs {
     /// end of the link and leaves the link behind, now dangling. What the caller
     /// asked to replace is the path; the file the link points at is a second
     /// file at a second path that nothing about generating here names, and it is
-    /// bounded only by `fs_permissions`. forge-std 1.16.2 has no cheatcode that
+    /// bounded only by `fs_permissions`. forge-std 1.17.0 has no cheatcode that
     /// acts on the link, so this shells out instead: `rm` acts on the name it is
     /// given and never follows a symlink operand, whatever is at the other end.
     ///

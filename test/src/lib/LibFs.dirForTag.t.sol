@@ -69,6 +69,8 @@ contract LibFsDirForTagTest is Test {
     function testDirForTagIsRelative(bytes memory seed) external pure {
         bytes memory dir = bytes(LibFs.dirForTag(LibCodeGenSlow.tagFromSeedSlow(seed)));
         assertTrue(dir.length > 0, "empty directory");
+        // The literal is one byte, so bytes1 holds all of it.
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertNotEq(uint8(dir[0]), uint8(bytes1("/")), "directory is absolute");
     }
 
@@ -85,6 +87,8 @@ contract LibFsDirForTagTest is Test {
             if (dir[i] == "/") {
                 separators++;
             }
+            // The literal is one byte, so bytes1 holds all of it.
+            // forge-lint: disable-next-line(unsafe-typecast)
             assertNotEq(uint8(dir[i]), uint8(bytes1(".")), "a dot in the directory");
         }
         uint256 generatedSeparators = 0;

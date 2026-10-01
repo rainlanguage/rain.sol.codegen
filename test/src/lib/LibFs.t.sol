@@ -99,6 +99,8 @@ contract LibFsTest is Test {
     function testPathForContractIsRelative(bytes memory seed) external pure {
         bytes memory path = bytes(LibFs.pathForContract(LibCodeGenSlow.nameFromSeedSlow(seed)));
         assertTrue(path.length > 0, "empty path");
+        // The literal is one byte, so bytes1 holds all of it.
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertNotEq(uint8(path[0]), uint8(bytes1("/")), "path is absolute");
     }
 

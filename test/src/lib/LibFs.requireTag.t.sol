@@ -144,7 +144,11 @@ contract LibFsRequireTagTest is Test {
     /// the same range arithmetic the library uses.
     function testRequireTagEveryLeadingByte() external {
         for (uint256 i = 0; i < 256; i++) {
+            // `i` runs over exactly 0..255, so uint8 holds every value it takes.
+            // forge-lint: disable-next-line(unsafe-typecast)
             string memory tag = string(bytes.concat(bytes1(uint8(i))));
+            // `i` runs over exactly 0..255, so uint8 holds every value it takes.
+            // forge-lint: disable-next-line(unsafe-typecast)
             if (LibCodeGenSlow.containsSlow(SLOW_TAIL_ALPHABET, bytes1(uint8(i)))) {
                 assertAccepted(tag);
             } else {
@@ -158,7 +162,11 @@ contract LibFsRequireTagTest is Test {
     /// a tag differ from a contract name.
     function testRequireTagEveryTrailingByte() external {
         for (uint256 i = 0; i < 256; i++) {
+            // `i` runs over exactly 0..255, so uint8 holds every value it takes.
+            // forge-lint: disable-next-line(unsafe-typecast)
             string memory tag = string(bytes.concat(bytes("0"), bytes1(uint8(i))));
+            // `i` runs over exactly 0..255, so uint8 holds every value it takes.
+            // forge-lint: disable-next-line(unsafe-typecast)
             if (LibCodeGenSlow.containsSlow(SLOW_TAIL_ALPHABET, bytes1(uint8(i)))) {
                 assertAccepted(tag);
             } else {
@@ -217,14 +225,22 @@ contract LibFsRequireTagTest is Test {
     /// no accepted tag can leave the directory it is interpolated into. Stated
     /// as a property of the accepted set rather than as a list of the sequences
     /// that would escape.
-    function testRequireTagAcceptedTagsCannotTraverse(string memory tag) external {
+    function testRequireTagAcceptedTagsCannotTraverse(string memory tag) external view {
         try this.callRequireTag(tag) {
             bytes memory tagBytes = bytes(tag);
             assertGt(tagBytes.length, 0, "empty tag accepted");
             for (uint256 i = 0; i < tagBytes.length; i++) {
+                // The literal is one byte, so bytes1 holds all of it.
+                // forge-lint: disable-next-line(unsafe-typecast)
                 assertNotEq(uint8(tagBytes[i]), uint8(bytes1("/")), "separator accepted");
+                // The literal is one byte, so bytes1 holds all of it.
+                // forge-lint: disable-next-line(unsafe-typecast)
                 assertNotEq(uint8(tagBytes[i]), uint8(bytes1("\\")), "backslash accepted");
+                // The literal is one byte, so bytes1 holds all of it.
+                // forge-lint: disable-next-line(unsafe-typecast)
                 assertNotEq(uint8(tagBytes[i]), uint8(bytes1(".")), "dot accepted");
+                // The literal is one byte, so bytes1 holds all of it.
+                // forge-lint: disable-next-line(unsafe-typecast)
                 assertNotEq(uint8(tagBytes[i]), uint8(bytes1(hex"00")), "nul accepted");
             }
         } catch {}

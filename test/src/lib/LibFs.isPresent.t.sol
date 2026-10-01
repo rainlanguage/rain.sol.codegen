@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {Test} from "forge-std-1.16.2/src/Test.sol";
-import {VmSafe} from "forge-std-1.16.2/src/Vm.sol";
+import {Test} from "forge-std-1.17.0/src/Test.sol";
+import {VmSafe} from "forge-std-1.17.0/src/Vm.sol";
 import {LibFs, GENERATED_DIR} from "src/lib/LibFs.sol";
 import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 
@@ -13,7 +13,7 @@ import {LibFsExternal} from "test/concrete/LibFsExternal.sol";
 /// answers for a symlink is asserted here together with both writes that depend
 /// on it.
 ///
-/// Symlinks are built with `ln` because forge-std 1.16.2 has no cheatcode that
+/// Symlinks are built with `ln` because forge-std 1.17.0 has no cheatcode that
 /// creates one, and they are read back with `readlink`, which reports the path
 /// itself and fails on anything that is not a symlink. `vm.readLink` is what the
 /// library uses, so it is deliberately not what asserts here.

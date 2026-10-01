@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2020 Rain Open Source Software Ltd
 pragma solidity =0.8.25;
 
-import {VmSafe} from "forge-std-1.16.2/src/Vm.sol";
+import {VmSafe} from "forge-std-1.17.0/src/Vm.sol";
 
 /// Thrown by `RemovalVm.writeFile`.
 /// @param path The path the write was for.

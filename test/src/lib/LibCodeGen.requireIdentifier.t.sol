@@ -39,9 +39,17 @@ contract LibCodeGenRequireIdentifierTest is Test {
         bytes memory alphabetBytes = bytes(alphabet);
         assertGt(alphabetBytes.length, 0, "empty alphabet");
         for (uint256 i = 0; i < alphabetBytes.length; i++) {
+            // The literal is one byte, so bytes1 holds all of it.
+            // forge-lint: disable-next-line(unsafe-typecast)
             assertNotEq(uint8(alphabetBytes[i]), uint8(bytes1("/")), "separator in the alphabet");
+            // The literal is one byte, so bytes1 holds all of it.
+            // forge-lint: disable-next-line(unsafe-typecast)
             assertNotEq(uint8(alphabetBytes[i]), uint8(bytes1("\\")), "backslash in the alphabet");
+            // The literal is one byte, so bytes1 holds all of it.
+            // forge-lint: disable-next-line(unsafe-typecast)
             assertNotEq(uint8(alphabetBytes[i]), uint8(bytes1(".")), "dot in the alphabet");
+            // The literal is one byte, so bytes1 holds all of it.
+            // forge-lint: disable-next-line(unsafe-typecast)
             assertNotEq(uint8(alphabetBytes[i]), uint8(bytes1(hex"00")), "nul in the alphabet");
         }
     }
@@ -175,7 +183,11 @@ contract LibCodeGenRequireIdentifierTest is Test {
     /// arithmetic the library uses.
     function testRequireIdentifierEveryLeadingByte() external {
         for (uint256 i = 0; i < 256; i++) {
+            // `i` runs over exactly 0..255, so uint8 holds every value it takes.
+            // forge-lint: disable-next-line(unsafe-typecast)
             string memory name = string(bytes.concat(bytes1(uint8(i))));
+            // `i` runs over exactly 0..255, so uint8 holds every value it takes.
+            // forge-lint: disable-next-line(unsafe-typecast)
             if (LibCodeGenSlow.containsSlow(SLOW_HEAD_ALPHABET, bytes1(uint8(i)))) {
                 assertAccepted(name);
             } else {
@@ -189,7 +201,11 @@ contract LibCodeGenRequireIdentifierTest is Test {
     /// accepted here and rejected there.
     function testRequireIdentifierEveryTrailingByte() external {
         for (uint256 i = 0; i < 256; i++) {
+            // `i` runs over exactly 0..255, so uint8 holds every value it takes.
+            // forge-lint: disable-next-line(unsafe-typecast)
             string memory name = string(bytes.concat(bytes("A"), bytes1(uint8(i))));
+            // `i` runs over exactly 0..255, so uint8 holds every value it takes.
+            // forge-lint: disable-next-line(unsafe-typecast)
             if (LibCodeGenSlow.containsSlow(SLOW_TAIL_ALPHABET, bytes1(uint8(i)))) {
                 assertAccepted(name);
             } else {

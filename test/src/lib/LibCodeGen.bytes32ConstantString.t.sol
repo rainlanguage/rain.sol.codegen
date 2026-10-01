@@ -26,7 +26,7 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
         return LibCodeGen.bytes32ConstantString(vm, comment, name, data);
     }
 
-    function testBytes32ConstantString() external view {
+    function testBytes32ConstantString() external pure {
         assertEq(
             LibCodeGen.bytes32ConstantString(
                 vm,
@@ -43,7 +43,7 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
     /// should be emitting it is the caller's problem — `bytecodeHashConstantString`
     /// refuses a codeless address for exactly that reason — and this function
     /// emits it as plainly as any other value.
-    function testBytes32ConstantStringZero() external view {
+    function testBytes32ConstantStringZero() external pure {
         assertEq(
             LibCodeGen.bytes32ConstantString(vm, "/// @dev Zero.", "ZERO", bytes32(0)),
             "\n/// @dev Zero.\nbytes32 constant ZERO ="
@@ -55,7 +55,7 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
     /// generated from, rather than being truncated or reformatted. The literal
     /// is sliced out of the emitted text, so the round trip is a property of
     /// what the library wrote.
-    function testBytes32ConstantStringRoundTrips(bytes32 data) external view {
+    function testBytes32ConstantStringRoundTrips(bytes32 data) external pure {
         string memory emitted = LibCodeGen.bytes32ConstantString(vm, "/// @dev Fuzz.", "FUZZ", data);
         assertEq(
             emitted, string.concat("\n/// @dev Fuzz.\nbytes32 constant FUZZ = bytes32(", vm.toString(data), ");\n")
@@ -66,7 +66,7 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
     /// A declaration of exactly the maximum length stays on one line. `forge fmt`
     /// leaves a line of exactly `line_length` alone, so wrapping here would be a
     /// reflow the formatter immediately undoes.
-    function testBytes32ConstantStringAtMaxLength() external view {
+    function testBytes32ConstantStringAtMaxLength() external pure {
         string memory name = LibCodeGenSlow.nameOfLengthSlow(24);
         string memory emitted = LibCodeGen.bytes32ConstantString(vm, "/// @dev At max.", name, SOME_HASH);
         assertEq(
@@ -78,7 +78,7 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
 
     /// One character past the maximum wraps after the `=`, with the value
     /// indented by one tab width on the next line.
-    function testBytes32ConstantStringOverMaxLength() external view {
+    function testBytes32ConstantStringOverMaxLength() external pure {
         string memory name = LibCodeGenSlow.nameOfLengthSlow(25);
         assertEq(
             LibCodeGen.bytes32ConstantString(vm, "/// @dev Over max.", name, SOME_HASH),
@@ -95,7 +95,7 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
     /// one is rejected before anything is emitted at all.
     function testBytes32ConstantStringMatchesMeasuredLine(string memory comment, bytes memory seed, bytes32 data)
         external
-        view
+        pure
     {
         string memory name = LibCodeGenSlow.nameFromSeedSlow(seed);
         assertEq(
@@ -136,7 +136,7 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
     /// consecutive newlines are a blank line that `forge fmt` collapses, so a
     /// generated file carrying one is not stable under the formatter and a
     /// consumer's `forge fmt --check` reds when it regenerates.
-    function testBytes32ConstantStringEmptyComment() external view {
+    function testBytes32ConstantStringEmptyComment() external pure {
         assertEq(
             LibCodeGen.bytes32ConstantString(vm, "", "NO_COMMENT", SOME_HASH),
             string.concat("\nbytes32 constant NO_COMMENT = bytes32(", SOME_HASH_STRING, ");\n")
@@ -146,7 +146,7 @@ contract LibCodeGenBytes32ConstantStringTest is Test {
     /// The comment is the only thing an empty comment removes: the declaration
     /// that follows it is byte for byte the same either way, including the
     /// blank line that separates it from whatever precedes it.
-    function testBytes32ConstantStringEmptyCommentKeepsDeclaration() external view {
+    function testBytes32ConstantStringEmptyCommentKeepsDeclaration() external pure {
         assertEq(
             LibCodeGen.bytes32ConstantString(vm, "/// @dev Some hash.", "NO_COMMENT", SOME_HASH),
             string.concat("\n/// @dev Some hash.", LibCodeGen.bytes32ConstantString(vm, "", "NO_COMMENT", SOME_HASH))

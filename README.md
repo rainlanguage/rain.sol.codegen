@@ -147,7 +147,8 @@ reusable on every push to `main`, passing the package name explicitly as
 
 That workflow owns both the version and the release tag, so neither is set by
 hand. The next version is derived from the Soldeer registry and `next-v*` git
-tags, so this repo's own release version is not recorded in its files (dependency versions still live in `soldeer.lock`).
+tags, so this repo's own release version is not recorded in its files
+(dependency versions still live in `soldeer.lock`).
 
 ## License
 

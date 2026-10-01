@@ -26,7 +26,7 @@ contract LibCodeGenAddressConstantStringTest is Test {
         return LibCodeGen.addressConstantString(vm, comment, name, data);
     }
 
-    function testAddressConstantString() external view {
+    function testAddressConstantString() external pure {
         assertEq(
             LibCodeGen.addressConstantString(
                 vm, "/// @dev Some address.", "SOME_ADDRESS", address(0xc51a14251b0dcF0ae24A96b7153991378938f5F5)
@@ -36,7 +36,7 @@ contract LibCodeGenAddressConstantStringTest is Test {
     }
 
     /// The zero address is a real value, not a sentinel to special-case.
-    function testAddressConstantStringZero() external view {
+    function testAddressConstantStringZero() external pure {
         assertEq(
             LibCodeGen.addressConstantString(vm, "/// @dev Zero.", "ZERO", address(0)),
             "\n/// @dev Zero.\naddress constant ZERO = address(0x0000000000000000000000000000000000000000);\n"
@@ -46,7 +46,7 @@ contract LibCodeGenAddressConstantStringTest is Test {
     /// The literal the declaration carries parses back to the address it was
     /// generated from. The literal is sliced out of the emitted text, so the
     /// round trip is a property of what the library wrote.
-    function testAddressConstantStringRoundTrips(address data) external view {
+    function testAddressConstantStringRoundTrips(address data) external pure {
         string memory emitted = LibCodeGen.addressConstantString(vm, "/// @dev Fuzz.", "FUZZ", data);
         assertEq(
             emitted, string.concat("\n/// @dev Fuzz.\naddress constant FUZZ = address(", vm.toString(data), ");\n")
@@ -60,7 +60,7 @@ contract LibCodeGenAddressConstantStringTest is Test {
     /// accepts either form, so the round trip cannot tell them apart and this
     /// is stated against a reference that derives the checksum from the
     /// address's own bits.
-    function testAddressConstantStringChecksummed(address data) external view {
+    function testAddressConstantStringChecksummed(address data) external pure {
         string memory emitted = LibCodeGen.addressConstantString(vm, "/// @dev Fuzz.", "FUZZ", data);
         assertEq(LibCodeGenSlow.betweenSlow(emitted, "address(", ")"), LibCodeGenSlow.checksumAddressSlow(data));
     }
@@ -68,7 +68,7 @@ contract LibCodeGenAddressConstantStringTest is Test {
     /// A declaration of exactly the maximum length stays on one line. `forge fmt`
     /// leaves a line of exactly `line_length` alone, so wrapping here would be a
     /// reflow the formatter immediately undoes.
-    function testAddressConstantStringAtMaxLength() external view {
+    function testAddressConstantStringAtMaxLength() external pure {
         string memory name = LibCodeGenSlow.nameOfLengthSlow(48);
         string memory emitted = LibCodeGen.addressConstantString(vm, "/// @dev At max.", name, SOME_ADDRESS);
         assertEq(
@@ -80,7 +80,7 @@ contract LibCodeGenAddressConstantStringTest is Test {
 
     /// One character past the maximum wraps after the `=`, with the value
     /// indented by one tab width on the next line.
-    function testAddressConstantStringOverMaxLength() external view {
+    function testAddressConstantStringOverMaxLength() external pure {
         string memory name = LibCodeGenSlow.nameOfLengthSlow(49);
         assertEq(
             LibCodeGen.addressConstantString(vm, "/// @dev Over max.", name, SOME_ADDRESS),
@@ -99,7 +99,7 @@ contract LibCodeGenAddressConstantStringTest is Test {
     /// one is rejected before anything is emitted at all.
     function testAddressConstantStringMatchesMeasuredLine(string memory comment, bytes memory seed, address data)
         external
-        view
+        pure
     {
         string memory name = LibCodeGenSlow.nameFromSeedSlow(seed);
         assertEq(
@@ -140,7 +140,7 @@ contract LibCodeGenAddressConstantStringTest is Test {
     /// consecutive newlines are a blank line that `forge fmt` collapses, so a
     /// generated file carrying one is not stable under the formatter and a
     /// consumer's `forge fmt --check` reds when it regenerates.
-    function testAddressConstantStringEmptyComment() external view {
+    function testAddressConstantStringEmptyComment() external pure {
         assertEq(
             LibCodeGen.addressConstantString(vm, "", "NO_COMMENT", SOME_ADDRESS),
             string.concat("\naddress constant NO_COMMENT = address(", SOME_ADDRESS_STRING, ");\n")
@@ -150,7 +150,7 @@ contract LibCodeGenAddressConstantStringTest is Test {
     /// The comment is the only thing an empty comment removes: the declaration
     /// that follows it is byte for byte the same either way, including the
     /// blank line that separates it from whatever precedes it.
-    function testAddressConstantStringEmptyCommentKeepsDeclaration() external view {
+    function testAddressConstantStringEmptyCommentKeepsDeclaration() external pure {
         assertEq(
             LibCodeGen.addressConstantString(vm, "/// @dev Some address.", "NO_COMMENT", SOME_ADDRESS),
             string.concat(

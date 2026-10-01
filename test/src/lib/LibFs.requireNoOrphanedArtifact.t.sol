@@ -71,7 +71,7 @@ contract LibFsRequireNoOrphanedArtifactTest is Test {
     /// refuses on, and they all share the one generated directory, so a fixture
     /// left behind by a failing run is a precondition the next run does not get
     /// to choose.
-    function checkOutcome(string memory contractName) internal returns (bytes memory) {
+    function checkOutcome(string memory contractName) internal view returns (bytes memory) {
         try iExternal.requireNoOrphanedArtifact(vm, contractName) {
             return "";
         } catch (bytes memory reason) {

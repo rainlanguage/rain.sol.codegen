@@ -81,6 +81,8 @@ contract LibFsPathForTaggedContractTest is Test {
             )
         );
         assertTrue(path.length > 0, "empty path");
+        // The literal is one byte, so bytes1 holds all of it.
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertNotEq(uint8(path[0]), uint8(bytes1("/")), "path is absolute");
     }
 
@@ -141,6 +143,8 @@ contract LibFsPathForTaggedContractTest is Test {
         for (uint256 i = 0; i < generated.length; i++) {
             assertEq(uint8(pathBytes[i]), uint8(generated[i]), "path does not begin with the generated directory");
         }
+        // The literal is one byte, so bytes1 holds all of it.
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(uint8(pathBytes[generated.length]), uint8(bytes1("/")), "generated directory is not a path prefix");
 
         uint256 separators = 0;
@@ -176,7 +180,7 @@ contract LibFsPathForTaggedContractTest is Test {
         bytes memory nameSeed,
         bool rawTag,
         bool rawName
-    ) external {
+    ) external view {
         string memory tag = rawTag ? string(tagSeed) : LibCodeGenSlow.tagFromSeedSlow(tagSeed);
         string memory contractName = rawName ? string(nameSeed) : LibCodeGenSlow.nameFromSeedSlow(nameSeed);
         try iExternal.pathForTaggedContract(tag, contractName) returns (string memory path) {
@@ -205,7 +209,7 @@ contract LibFsPathForTaggedContractTest is Test {
         uint256 position,
         uint8 badByte,
         bool inTag
-    ) external {
+    ) external view {
         bytes memory tagBytes = bytes(LibCodeGenSlow.tagFromSeedSlow(tagSeed));
         bytes memory nameBytes = bytes(LibCodeGenSlow.nameFromSeedSlow(nameSeed));
         if (inTag) {

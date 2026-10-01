@@ -91,6 +91,8 @@ contract LibHexStringBytesToHexTest is Test {
     function testBytesToHexHasNoPrefix(bytes memory data) external pure {
         bytes memory hexBytes = bytes(LibHexString.bytesToHex(vm, data));
         for (uint256 i = 0; i < hexBytes.length; i++) {
+            // The literal is one byte, so bytes1 holds all of it.
+            // forge-lint: disable-next-line(unsafe-typecast)
             assertTrue(hexBytes[i] != bytes1("x"), "prefix survived");
         }
     }
@@ -124,7 +126,11 @@ contract LibHexStringBytesToHexTest is Test {
     function testBytesToHexIsVmToStringWithoutPrefix(bytes memory data) external pure {
         bytes memory full = bytes(vm.toString(data));
         assertEq(full.length, data.length * 2 + 2);
+        // The literal is one byte, so bytes1 holds all of it.
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(full[0], bytes1("0"));
+        // The literal is one byte, so bytes1 holds all of it.
+        // forge-lint: disable-next-line(unsafe-typecast)
         assertEq(full[1], bytes1("x"));
 
         bytes memory expected = new bytes(full.length - 2);
@@ -264,6 +270,8 @@ contract LibHexStringBytesToHexTest is Test {
     function testBytesToHexLongData() external pure {
         bytes memory data = new bytes(300);
         for (uint256 i = 0; i < data.length; i++) {
+            // `i` runs past 255 on purpose: the bytes are a repeating pattern and only their count is asserted.
+            // forge-lint: disable-next-line(unsafe-typecast)
             data[i] = bytes1(uint8(i));
         }
         string memory hexString = LibHexString.bytesToHex(vm, data);
@@ -484,6 +492,8 @@ contract LibHexStringBytesToHexTest is Test {
             bytes memory fillerBytes = bytes(filler);
             bytes memory payload = new bytes(data.length * 2);
             for (uint256 i = 0; i < payload.length; i++) {
+                // The literal is one byte, so bytes1 holds all of it.
+                // forge-lint: disable-next-line(unsafe-typecast)
                 payload[i] = fillerBytes.length == 0 ? bytes1("a") : fillerBytes[i % fillerBytes.length];
             }
             toStringReturn = string.concat("0x", string(payload));
@@ -495,6 +505,8 @@ contract LibHexStringBytesToHexTest is Test {
         uint256 expectedLength = data.length * 2 + 2;
         // The length equality implies at least 2 characters, so the prefix
         // reads only happen once indexing them is in bounds.
+        // The literal is one byte, so bytes1 holds all of it.
+        // forge-lint: disable-next-line(unsafe-typecast)
         bool conforms = returned.length == expectedLength && returned[0] == bytes1("0") && returned[1] == bytes1("x");
         // `toString(bytes)` is defined to emit two lower case hexadecimal
         // nibbles per input byte, so a payload character outside that charset is

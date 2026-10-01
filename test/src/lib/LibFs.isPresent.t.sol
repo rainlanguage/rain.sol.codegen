@@ -128,7 +128,7 @@ contract LibFsIsPresentTest is Test {
     /// Two deep is deliberately deeper than the library asks for: what this
     /// establishes is which of the two a listing that did reach the second
     /// level would answer from.
-    function listedBefore(string memory first, string memory second) internal returns (bool) {
+    function listedBefore(string memory first, string memory second) internal view returns (bool) {
         VmSafe.DirEntry[] memory entries = vm.readDir(GENERATED_DIR, 2, false);
         uint256 firstIndex = type(uint256).max;
         uint256 secondIndex = type(uint256).max;
